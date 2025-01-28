@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Players Tasks</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Players Tasks</h1>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/players-tasks">Players Tasks</a></li>
+                <li><a href="/players-champs">Players Champs</a></li>
+                <li><a href="/match-history">Match History</a></li>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <li><a href="/tasks">Tasks</a></li>
+                <li><a href="/register-player">Register Player</a></li>
+                <li><a href="/assign-task">Assign Task</a></li>
+                <li><a href="/update-progress">Update Progress</a></li>
+                <li><a href="/admin">Admin Dashboard</a></li>
+                {% endif %}
+                <li><a href="/logout">Logout</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <section class="content card">
+            {% for summoner_name, tasks in players_tasks.items() %}
+                <article>
+                    <h2>{{ summoner_name }}</h2>
+                    <ul>
+                        {% for task in tasks %}
+                            <li>
+                                <p>{{ task.description }} - Progress: {{ task.progress }} - Completed: {{ task.is_completed }}</p>
+                                <div class="progress-bar" role="progressbar" aria-valuenow="{{ (task.progress / task.target_value) | multiply(100) | min_value(100) }}" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="progress {% if task.progress / task.target_value < 0.45 %}orange{% elif task.progress / task.target_value < 0.75 %}yellow{% else %}green{% endif %}" style="width: {{ (task.progress / task.target_value) | multiply(100) | min_value(100) }}%">
+                                        {{ (task.progress / task.target_value) | multiply(100) | min_value(100) | int }}%
+                                    </div>
+                                </div>
+                                <form method="POST" action="{{ url_for('unassign_task') }}" style="display:inline;">
+                                    <input type="hidden" name="task_id" value="{{ task.id }}">
+                                    <input type="hidden" name="player_id" value="{{ task.player_id }}">
+                                    <button type="submit">Unassign</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </article>
+            {% endfor %}
+        </section>
+    </main>
+</body>
+</html>

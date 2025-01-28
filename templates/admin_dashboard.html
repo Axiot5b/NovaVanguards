@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <h1>Admin Dashboard</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/players-tasks">Players Tasks</a></li>
+            <li><a href="/players-champs">Players Champs</a></li>
+            <li><a href="/match-history">Match History</a></li>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <li><a href="/tasks">Tasks</a></li>
+                <li><a href="/register-player">Register Player</a></li>
+                <li><a href="/assign-task">Assign Task</a></li>
+                <li><a href="/update-progress">Update Progress</a></li>
+                <li><a href="/admin">Admin Dashboard</a></li>
+                {% endif %}
+                <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    <div class="content card">
+        <h2>Welcome, Admin!</h2>
+        <p>This is the admin dashboard. Only users with the admin role can see this page.</p>
+        <h3>All Accounts</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr>
+                        <td>{{ user[0] }}</td>
+                        <td>{{ user[1] }}</td>
+                        <td>{{ user[2] }}</td>
+                        <td>
+                            <form action="{{ url_for('delete_user') }}" method="post" style="display:inline;">
+                                <input type="hidden" name="user_id" value="{{ user[0] }}">
+                                <button type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

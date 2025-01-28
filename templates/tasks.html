@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasks</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <h1>Tasks</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/players-tasks">Players Tasks</a></li>
+            <li><a href="/players-champs">Players Champs</a></li>
+            <li><a href="/match-history">Match History</a></li>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <li><a href="/tasks">Tasks</a></li>
+                <li><a href="/register-player">Register Player</a></li>
+                <li><a href="/assign-task">Assign Task</a></li>
+                <li><a href="/update-progress">Update Progress</a></li>
+                <li><a href="/admin">Admin Dashboard</a></li>
+                {% endif %}
+                <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    <div class="content card">
+        <h2>Create Task</h2>
+        <form method="POST" action="{{ url_for('manage_tasks') }}">
+            <p>
+                <label for="description">Description</label><br>
+                <input id="description" name="description" required size="32" type="text">
+            </p>
+            <p>
+                <label for="objective_type">Objective Type</label><br>
+                <select id="objective_type" name="objective_type" required>
+                    <option value="kills">Kills</option>
+                    <option value="average_cs_per_min">average_cs_per_min</option>
+                    <option value="assists">assists</option>
+                    <option value="turret_kills">turret_kills</option>
+                    <option value="damage">Damage</option>
+                    <option value="kill_participation">kill_participation</option>
+                    <option value="kda">KDA</option>
+                    <option value="solo_kills">Solo Kills</option>
+                    <option value="wins">wins</option>
+                    <option value="dragons">Dragons</option>
+                    <option value="barons">Barons</option>
+                    <option value="wards_placed">Wards Placed</option>
+                    <option value="atakhan_kills">Atakhan Kills</option>
+                </select>
+            </p>
+            <p>
+                <label for="target_value">Target Value</label><br>
+                <input id="target_value" name="target_value" required size="32" type="number" step="0.1">
+            </p>
+            <p>
+                <label for="points">Points</label><br>
+                <input id="points" name="points" required size="32" type="number">
+            </p>
+            <p>
+                <label for="champion">Champion (optional)</label><br>
+                <input id="champion" name="champion" size="32" type="text">
+            </p>
+            <p><input id="submit" name="submit" type="submit" value="Create Task"></p>
+        </form>
+    </div>
+    <div class="content card">
+        <h2>Existing Tasks</h2>
+        <ul>
+            {% for task in tasks %}
+                <li>
+                    ID: {{ task[0] }} - {{ task[1] }} - {{ task[2] }} - {{ task[3] }} - {{ task[4] }} - {{ task[5] if task[5] else 'none' }}
+                    <form method="POST" action="{{ url_for('manage_tasks') }}" style="display:inline;">
+                        <input type="hidden" name="task_id" value="{{ task.id }}">
+                        <input type="hidden" name="delete_task" value="1">
+                        <button type="submit">Delete</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

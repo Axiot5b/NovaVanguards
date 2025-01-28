@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assign Task</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <h1>Assign Task</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/players-tasks">Players Tasks</a></li>
+            <li><a href="/players-champs">Players Champs</a></li>
+            <li><a href="/match-history">Match History</a></li>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <li><a href="/tasks">Tasks</a></li>
+                <li><a href="/register-player">Register Player</a></li>
+                <li><a href="/assign-task">Assign Task</a></li>
+                <li><a href="/update-progress">Update Progress</a></li>
+                <li><a href="/admin">Admin Dashboard</a></li>
+                {% endif %}
+                <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    <div class="content">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        <form method="POST" action="{{ url_for('assign_task') }}">
+            <p>
+                <label for="summoner_name">Summoner Name</label><br>
+                <input id="summoner_name" name="summoner_name" required size="32" type="text">
+            </p>
+            <p>
+                <label for="task_id">Task ID</label><br>
+                <input id="task_id" name="task_id" required size="32" type="number">
+            </p>
+            <p><input id="submit" name="submit" type="submit" value="Assign Task"></p>
+        </form>
+    </div>
+</body>
+</html>

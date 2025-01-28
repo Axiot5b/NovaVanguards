@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Match History</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1e1e2f;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .history-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .match-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #2c2c3e;
+            border: 1px solid #444;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+
+        .match-card .left,
+        .match-card .right {
+            display: flex;
+            align-items: center;
+        }
+
+        .match-card .left img,
+        .match-card .right img {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+
+        .player-info {
+            margin-left: 10px;
+        }
+
+        .player-info .name {
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .stats {
+            text-align: center;
+        }
+
+        .stats .kda {
+            font-size: 1.1em;
+        }
+
+        .build, .spells {
+            display: flex;
+        }
+
+        .build img, .spells img {
+            width: 35px;
+            height: 35px;
+            margin-right: 5px;
+        }
+
+        .result {
+            font-weight: bold;
+            color: #ff4d4d; /* Red for loss */
+        }
+
+        .result.win {
+            color: #4caf50; /* Green for win */
+        }
+    </style>
+</head>
+<body>
+    <div class="history-container">
+        <h1>Match History - {{ summoner_name }}</h1>
+        
+        {% for match in matches %}
+        <div class="match-card">
+            <!-- Fecha y Nombre del jugador -->
+            <div class="left">
+                <div>
+                    <p>{{ match.match_date }}</p>
+                    <p class="player-info">
+                        <span class="name">{{ summoner_name }}</span> - {{ match.elo }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Campeón, KDA y Línea -->
+            <div class="center">
+                <img src="{{ match.champion_icon }}" alt="{{ match.champion_name }}">
+                <div class="stats">
+                    <p>{{ match.champion_name }}</p>
+                    <p class="kda">{{ match.kills }}/{{ match.deaths }}/{{ match.assists }}</p>
+                    <p>{{ match.lane }}</p>
+                </div>
+            </div>
+
+            <!-- Hechizos -->
+            <div class="spells">
+                <img src="{{ match.spell1_icon }}" alt="Spell 1">
+                <img src="{{ match.spell2_icon }}" alt="Spell 2">
+            </div>
+
+            <!-- Build -->
+            <div class="build">
+                {% for item in match.items %}
+                <img src="{{ item.icon }}" alt="{{ item.name }}">
+                {% endfor %}
+            </div>
+
+            <!-- Oro total -->
+            <div class="right">
+                <p class="gold">{{ match.total_gold }} Gold</p>
+                <p class="result {{ 'win' if match.result == 'Win' else 'loss' }}">
+                    {{ match.result }}
+                </p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

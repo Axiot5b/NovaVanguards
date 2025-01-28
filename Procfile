@@ -1,0 +1,1 @@
+web: gunicorn league_tasks_backend:app

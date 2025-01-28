@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Players Champs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <h1>Players Champs</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/players-tasks">Players Tasks</a></li>
+            <li><a href="/players-champs">Players Champs</a></li>
+            <li><a href="/match-history">Match History</a></li>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <li><a href="/tasks">Tasks</a></li>
+                <li><a href="/register-player">Register Player</a></li>
+                <li><a href="/assign-task">Assign Task</a></li>
+                <li><a href="/update-progress">Update Progress</a></li>
+                <li><a href="/admin">Admin Dashboard</a></li>
+                {% endif %}
+                <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    <div class="content card">
+        {% for summoner_name, data in players_champs.items() %}
+            <h2>{{ summoner_name }}</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Champion</th>
+                        <th>Pick</th>
+                        <th>KDA</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for champ in data.champions %}
+                        <tr>
+                            <td>
+                                <img src="{{ url_for('static', filename='img/champions/' ~ champ.champion_name ~ '.png') }}" 
+                                     alt="{{ champ.champion_name }}" class="champion-icon">
+                                {{ champ.champion_name }}
+                            </td>
+                            <td>{{ champ.count }}</td>
+                            <td>
+                                <span class="{% if champ.kda >= 3.0 %}kda-positive{% else %}kda-negative{% endif %}">
+                                    {{ champ.kda }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endfor %}
+    </div>
+</body>
+</html>

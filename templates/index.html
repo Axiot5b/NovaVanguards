@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>League Tasks</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .logo-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px; /* Espacio entre los logos */
+        }
+        .logo {
+            width: 100px; /* Ajusta el tamaño de los logos según sea necesario */
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <img src="{{ url_for('static', filename='img/logo_team1.png') }}" alt="Logo Team 1" class="logo">
+        <img src="{{ url_for('static', filename='img/logo_team2.png') }}" alt="Logo Team 2" class="logo">
+    </div>
+    <h1>League Tasks</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/players-tasks">Players Tasks</a></li>
+            <li><a href="/players-champs">Players Champs</a></li>
+            <li><a href="/match-history">Match History</a></li>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <li><a href="/tasks">Tasks</a></li>
+                <li><a href="/register-player">Register Player</a></li>
+                <li><a href="/assign-task">Assign Task</a></li>
+                <li><a href="/update-progress">Update Progress</a></li>
+                <li><a href="/admin">Admin Dashboard</a></li>
+            {% endif %}
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    <div class="content">
+        <h2>¡Bienvenido a League Tasks!</h2>
+        <p>Supera tus límites. Lleva un seguimiento de tu progreso, completa misiones emocionantes y gana puntos para destacar en Nova Vanguards y The Sector Nova.</p>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>

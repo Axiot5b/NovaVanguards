@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Progress</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .progress-bar {
+            width: 50%;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .progress {
+            height: 20px;
+            border-radius: 5px;
+            text-align: center;
+            color: white;
+            line-height: 20px;
+        }
+        .progress.orange { background-color: orange; }
+        .progress.yellow { background-color: yellow; color: black; }
+        .progress.green { background-color: green; }
+    </style>
+</head>
+<body>
+    <h1>Update Progress</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/players-tasks">Players Tasks</a></li>
+            <li><a href="/players-champs">Players Champs</a></li>
+            <li><a href="/match-history">Match History</a></li>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <li><a href="/tasks">Tasks</a></li>
+                <li><a href="/register-player">Register Player</a></li>
+                <li><a href="/assign-task">Assign Task</a></li>
+                <li><a href="/update-progress">Update Progress</a></li>
+                <li><a href="/admin">Admin Dashboard</a></li>
+                {% endif %}
+                <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    <div class="content card">
+        <form method="POST" action="{{ url_for('update_progress') }}">
+            <p>
+                <label for="summoner_name">Summoner Name</label><br>
+                <input id="summoner_name" name="summoner_name" required size="32" type="text">
+            </p>
+            <p><input id="submit" name="submit" type="submit" value="Update Progress"></p>
+        </form>
+        {% if updated_tasks %}
+        <h2>Updated Tasks</h2>
+        <ul>
+            {% for task in updated_tasks %}
+                <li>
+                    {{ task.description }} - Progress: {{ task.progress }} - Completed: {{ task.is_completed }}
+                    <div class="progress-bar">
+                        <div class="progress {% if task.progress / task.target_value < 0.45 %}orange{% elif task.progress / task.target_value < 0.75 %}yellow{% else %}green{% endif %}" style="width: {{ (task.progress / task.target_value) | multiply(100) | min_value(100) }}%">
+                            {{ (task.progress / task.target_value) | multiply(100) | min_value(100) | int }}%
+                        </div>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+</body>
+</html>

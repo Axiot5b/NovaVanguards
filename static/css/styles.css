@@ -1,0 +1,111 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f4f9;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+nav ul {
+    list-style-type: none;
+    padding: 0;
+    text-align: center;
+}
+
+nav ul li {
+    display: inline;
+    margin: 0 15px;
+}
+
+nav ul li a {
+    text-decoration: none;
+    color: #333;
+    font-weight: bold;
+}
+
+nav ul li a:hover {
+    text-decoration: underline;
+}
+
+.content {
+    margin-top: 20px;
+}
+
+.card {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+ul li {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.champion-icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+}
+
+.progress-bar {
+    width: 50%;
+    background-color: #f3f3f3;
+    border-radius: 5px;
+    overflow: hidden;
+}
+.progress {
+    height: 20px;
+    border-radius: 5px;
+    text-align: center;
+    color: white;
+    line-height: 20px;
+}
+.progress.orange { background-color: orange; }
+.progress.yellow { background-color: yellow; color: black; }
+.progress.green { background-color: green; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+table th, table td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: left;
+}
+
+table th {
+    background-color: #f0f0f0;
+}
+
+.champion-icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+}
+
+.kda-positive {
+    color: green;
+}
+
+.kda-negative {
+    color: red;
+}
