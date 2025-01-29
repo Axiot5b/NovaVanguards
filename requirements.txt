@@ -24,4 +24,4 @@ requests==2.31.0
 urllib3==2.3.0
 Werkzeug==2.3.7
 WTForms==3.0.1
-scout_apm==3.3.0
+
