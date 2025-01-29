@@ -15,8 +15,7 @@ from flask import abort
 from items import item_list
 from runes import RUNES
 from spells import SPELLS
-from flask import Flask
-from scout_apm.flask import ScoutApm
+
 
 # Adaptadores personalizados para datetime
 def adapt_datetime(dt):
@@ -42,13 +41,6 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Configurar Scout APM
-ScoutApm(app)
-
-# Configuración de Scout
-app.config["SCOUT_MONITOR"] = True
-app.config["SCOUT_KEY"] = "891kqgn7KHfJ6b0XZ4c0"
-app.config["SCOUT_NAME"] = "league_tasks"
 
 # Bloqueo para la base de datos
 db_lock = Lock()
