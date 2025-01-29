@@ -5,26 +5,131 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Players Champs</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        /* General */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            color: #ffffff;
+        }
+
+        h2 {
+            text-align: center;
+            color: #000000;
+        }
+
+        .content {
+            margin: 20px auto;
+            width: 90%;
+            max-width: 1200px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        /* Navbar */
+        nav {
+            background: #222;
+            padding: 10px 0;
+        }
+
+        nav ul {
+            list-style: none;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        nav ul li {
+            display: inline;
+            margin: 0 15px;
+        }
+
+        nav ul li a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        nav ul li a:hover {
+            text-decoration: underline;
+        }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        table thead {
+            background-color: #f4f4f4;
+        }
+
+        table th, table td {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        table th {
+            background-color: #333;
+            color: white;
+        }
+
+        table tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .champion-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        /* KDA Styling */
+        .kda-positive {
+            color: green;
+            font-weight: bold;
+        }
+
+        .kda-negative {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-    <h1>Players Champs</h1>
-    <nav>
-        <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/players-tasks">Players Tasks</a></li>
-            <li><a href="/players-champs">Players Champs</a></li>
-            <li><a href="/match-history">Match History</a></li>
-            {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                <li><a href="/tasks">Tasks</a></li>
-                <li><a href="/register-player">Register Player</a></li>
-                <li><a href="/assign-task">Assign Task</a></li>
-                <li><a href="/update-progress">Update Progress</a></li>
-                <li><a href="/admin">Admin Dashboard</a></li>
+    <header>
+        <h1>Players Champs</h1>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/players-tasks">Players Tasks</a></li>
+                <li><a href="/players-champs">Players Champs</a></li>
+                <li><a href="/match-history">Match History</a></li>
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <li><a href="/tasks">Tasks</a></li>
+                    <li><a href="/register-player">Register Player</a></li>
+                    <li><a href="/assign-task">Assign Task</a></li>
+                    <li><a href="/update-progress">Update Progress</a></li>
+                    <li><a href="/admin">Admin Dashboard</a></li>
                 {% endif %}
                 <li><a href="/logout">Logout</a></li>
-        </ul>
-    </nav>
-    <div class="content card">
+            </ul>
+        </nav>
+    </header>
+
+    <div class="content">
         {% for summoner_name, data in players_champs.items() %}
             <h2>{{ summoner_name }}</h2>
             <table>

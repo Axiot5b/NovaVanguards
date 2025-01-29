@@ -12,6 +12,11 @@ from threading import Lock
 from champions import champions
 from functools import wraps
 from flask import abort
+from items import item_list
+from runes import RUNES
+from spells import SPELLS
+from flask import Flask
+from scout_apm.flask import ScoutApm
 
 # Adaptadores personalizados para datetime
 def adapt_datetime(dt):
@@ -25,7 +30,7 @@ sqlite3.register_adapter(datetime, adapt_datetime)
 sqlite3.register_converter("timestamp", convert_timestamp)
 
 # Configuración básica
-API_KEY = "RGAPI-fce216f8-6b6c-4edf-87bd-1c0b53b4435c"
+API_KEY = "RGAPI-965e8ab6-d0ac-497e-af39-34e84d533792"
 SUMMONER_API_BASE_URL = "https://la1.api.riotgames.com"  # Base URL para datos del jugador (LAN)
 MATCH_API_BASE_URL = "https://americas.api.riotgames.com"  # Base URL para datos de partidas
 DB_NAME = "league_tasks.db"
@@ -36,6 +41,14 @@ app.secret_key = 'your_secret_key'
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Configurar Scout APM
+ScoutApm(app)
+
+# Configuración de Scout
+app.config["SCOUT_MONITOR"] = True
+app.config["SCOUT_KEY"] = "891kqgn7KHfJ6b0XZ4c0"
+app.config["SCOUT_NAME"] = "league_tasks"
 
 # Bloqueo para la base de datos
 db_lock = Lock()
@@ -89,10 +102,30 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def get_db():
+    conn = sqlite3.connect(DB_NAME, timeout=10, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn.row_factory = sqlite3.Row  # Esto permite acceder a las columnas por nombre
+    return conn
+
+# Bloqueo para asegurar acceso concurrente seguro a la base de datos
+db_lock = Lock()
+
+# Función para obtener la conexión a la base de datos principal
+def get_db():
+    conn = sqlite3.connect('league_tasks.db', timeout=30, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn.row_factory = sqlite3.Row  # Esto permite acceder a las columnas por nombre
+    return conn
+
+# Función para obtener la conexión a la base de datos de historial de partidas
+def get_match_history_db():
+    conn = sqlite3.connect('match_history.db', timeout=30, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn.row_factory = sqlite3.Row  # Esto permite acceder a las columnas por nombre
+    return conn
+
 # Funciones auxiliares para la base de datos
 def init_db():
     with db_lock:
-        conn = sqlite3.connect(DB_NAME, timeout=10)
+        conn = get_db()
         cursor = conn.cursor()
         
         # Crear tabla players si no existe
@@ -109,13 +142,6 @@ def init_db():
                 last_update TIMESTAMP
             )
         ''')
-        
-        # Verificar si la columna last_update existe, si no, agregarla
-        cursor.execute("PRAGMA table_info(players)")
-        columns = [column[1] for column in cursor.fetchall()]
-        if 'last_update' not in columns:
-            cursor.execute("ALTER TABLE players ADD COLUMN last_update TIMESTAMP")
-            cursor.execute("UPDATE players SET last_update = ?", (datetime.now(timezone.utc),))
         
         # Crear tabla tasks si no existe
         cursor.execute('''
@@ -153,12 +179,6 @@ def init_db():
             )
         ''')
 
-        # Verificar si la columna role existe, si no, agregarla
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [column[1] for column in cursor.fetchall()]
-        if 'role' not in columns:
-            cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
-        
         # Crear tabla player_stats si no existe
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS player_stats (
@@ -173,10 +193,20 @@ def init_db():
                 FOREIGN KEY (puuid) REFERENCES players(puuid)
             )
         ''')
+
+        conn.commit()
+        conn.close()
+
+def init_match_history_db():
+    with db_lock:
+        conn = get_match_history_db()
+        cursor = conn.cursor()
+        
         # Crear tabla match_history si no existe
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS match_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                match_id TEXT UNIQUE,
                 puuid TEXT,
                 match_date TIMESTAMP,
                 champion_id INTEGER,
@@ -189,17 +219,30 @@ def init_db():
                 secondary_runes TEXT,
                 spells TEXT,
                 items TEXT,
+                win BOOLEAN,
                 FOREIGN KEY (puuid) REFERENCES players(puuid)
             )
         ''')
+
+        # Verificar si la columna win existe, si no, agregarla
+        cursor.execute("PRAGMA table_info(match_history)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'win' not in columns:
+            cursor.execute("ALTER TABLE match_history ADD COLUMN win BOOLEAN")
 
         conn.commit()
         conn.close()
 
 def migrate_db():
     with db_lock:
-        conn = sqlite3.connect(DB_NAME, timeout=10)
+        conn = get_db()
         cursor = conn.cursor()
+
+        # Verificar si la columna match_id existe en match_history, si no, agregarla
+        cursor.execute("PRAGMA table_info(match_history)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'match_id' not in columns:
+            cursor.execute("ALTER TABLE match_history ADD COLUMN match_id TEXT UNIQUE")
 
         # Verificar si las columnas kills, deaths, assists existen en player_stats, si no, agregarlas
         cursor.execute("PRAGMA table_info(player_stats)")
@@ -218,28 +261,31 @@ def migrate_db():
 
 def update_user_roles():
     with db_lock:
-        conn = sqlite3.connect(DB_NAME, timeout=10)
+        conn = get_db()
         cursor = conn.cursor()
-        
-        # Lista de nombres de usuario a los que se les asignará el rol de admin
-        admin_users = ['axiot3b', 'NVE PXNZX', 'memoarias']  # Reemplaza con los nombres de usuario reales
 
-        for username in admin_users:
-            cursor.execute("UPDATE users SET role = 'admin' WHERE username = ?", (username,))
-        
+        # Aquí puedes agregar la lógica para actualizar los roles de los usuarios
+        # Por ejemplo, podrías actualizar el rol de un usuario específico
+        cursor.execute("UPDATE users SET role = 'admin' WHERE username = 'admin'")
+
         conn.commit()
         conn.close()
 
-def query_db(query, args=(), one=False):
+def query_db(query, args=(), one=False, db='league_tasks'):
     with db_lock:
-        conn = sqlite3.connect(DB_NAME, timeout=10, detect_types=sqlite3.PARSE_DECLTYPES)
-        cursor = conn.cursor()
-        cursor.execute(query, args)
-        result = cursor.fetchall()
-        conn.commit()
+        if db == 'league_tasks':
+            conn = get_db()
+        elif db == 'match_history':
+            conn = get_match_history_db()
+        else:
+            raise ValueError("Invalid database specified")
+
+        cursor = conn.execute(query, args)
+        rv = cursor.fetchall()
         cursor.close()
+        conn.commit()
         conn.close()
-        return (result[0] if result else None) if one else result
+        return (rv[0] if rv else None) if one else rv
     
 def match_ids(summoner_name):
     # Obtener el PUUID del jugador
@@ -612,15 +658,24 @@ def store_match_history(puuid):
     match_list_response = requests.get(match_list_url, headers=headers)
 
     if match_list_response.status_code != 200:
+        print(f"Error al obtener la lista de partidas para el PUUID {puuid}")
         return
 
     match_ids = match_list_response.json()
+    print(f"Match IDs for PUUID {puuid}: {match_ids}")
 
     for match_id in match_ids:
+        # Verificar si la partida ya existe en la base de datos
+        existing_match = query_db("SELECT 1 FROM match_history WHERE match_id = ?", (match_id,), one=True, db='match_history')
+        if existing_match:
+            print(f"Match {match_id} already exists in the database.")
+            continue
+
         match_url = f"{MATCH_API_BASE_URL}/lol/match/v5/matches/{match_id}"
         match_response = requests.get(match_url, headers=headers)
 
         if match_response.status_code != 200:
+            print(f"Error al obtener los datos de la partida {match_id}")
             continue
 
         match_data = match_response.json()
@@ -628,6 +683,7 @@ def store_match_history(puuid):
         player_stats = next((p for p in participants if p['puuid'] == puuid), None)
 
         if not player_stats:
+            print(f"No se encontraron estadísticas para el jugador con PUUID {puuid} en la partida {match_id}")
             continue
 
         match_date = datetime.fromtimestamp(match_data['info']['gameCreation'] / 1000, timezone.utc)
@@ -637,15 +693,58 @@ def store_match_history(puuid):
         assists = player_stats['assists']
         total_gold = player_stats['goldEarned']
         lane = player_stats['teamPosition']
-        primary_runes = ','.join([str(r) for r in player_stats['perks']['styles'][0]['selections']])
-        secondary_runes = ','.join([str(r) for r in player_stats['perks']['styles'][1]['selections']])
-        spells = ','.join([str(player_stats['summoner1Id']), str(player_stats['summoner2Id'])])
-        items = ','.join([str(player_stats[f'item{i}']) for i in range(7)])
+        primary_runes = ','.join([RUNES.get(r['perk'], str(r['perk'])) for r in player_stats['perks']['styles'][0]['selections']])
+        secondary_runes = ','.join([RUNES.get(r['perk'], str(r['perk'])) for r in player_stats['perks']['styles'][1]['selections']])
+        spells = ','.join([SPELLS.get(player_stats['summoner1Id'], str(player_stats['summoner1Id'])), SPELLS.get(player_stats['summoner2Id'], str(player_stats['summoner2Id']))])
+        items = ','.join([str(player_stats[f'item{i}']) for i in range(7) if player_stats[f'item{i}'] != 0])
 
+        # Determinar si el jugador ganó o perdió la partida
+        team_id = player_stats['teamId']
+        win = any(team['win'] for team in match_data['info']['teams'] if team['teamId'] == team_id)
+
+        # Imprimir estadísticas de la partida en la terminal
+        print(f"Match ID: {match_id}")
+        print(f"Match Date: {match_date}")
+        print(f"Champion ID: {champion_id}")
+        print(f"Kills: {kills}, Deaths: {deaths}, Assists: {assists}")
+        print(f"Total Gold: {total_gold}")
+        print(f"Lane: {lane}")
+        print(f"Primary Runes: {primary_runes}")
+        print(f"Secondary Runes: {secondary_runes}")
+        print(f"Spells: {spells}")
+        print(f"Items: {items}")
+        print(f"Win: {win}")
+        print("-" * 40)
+
+        # Insertar el registro en la base de datos
+        try:
+            query_db('''
+                INSERT INTO match_history (match_id, puuid, match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items, win)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (match_id, puuid, match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items, win), db='match_history')
+            print(f"Match {match_id} inserted into the database.")
+        except sqlite3.IntegrityError as e:
+            print(f"Error inserting match {match_id} into the database: {e}")
+        except sqlite3.OperationalError as e:
+            print(f"Database is locked: {e}")
+            time.sleep(1)  # Esperar un segundo antes de reintentar
+            continue
+
+    # Eliminar las partidas más antiguas si hay más de 20
+    try:
         query_db('''
-            INSERT INTO match_history (puuid, match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (puuid, match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items))
+            DELETE FROM match_history
+            WHERE match_id NOT IN (
+                SELECT match_id
+                FROM match_history
+                WHERE puuid = ?
+                ORDER BY match_date DESC
+                LIMIT 20
+            )
+        ''', (puuid,), db='match_history')
+        print(f"Old matches deleted for PUUID {puuid}.")
+    except Exception as e:
+        print(f"Error deleting old matches for PUUID {puuid}: {e}")
 
 # Endpoint para actualizar el progreso de las tareas
 @app.route('/update-progress', methods=['POST', 'GET'])
@@ -771,45 +870,85 @@ def get_players_champs():
 
     return render_template('players_champs.html', players_champs=result)
 
-@app.route('/match-history', methods=['GET'])
+@app.route('/match-history', methods=['GET', 'POST'])
 @login_required
 def match_history():
-    summoner_name = request.args.get('summoner_name')
-    player = query_db("SELECT puuid FROM players WHERE summoner_name = ?", (summoner_name,), one=True)
+    if request.method == 'POST':
+        summoner_name = request.form.get('summoner_name')
+    else:
+        summoner_name = request.args.get('summoner_name')
+
+    players = query_db("SELECT summoner_name FROM players", db='league_tasks')
+
+    if not summoner_name:
+        return render_template('match_history.html', players=players, matches=[])
+
+    player = query_db("SELECT puuid FROM players WHERE summoner_name = ?", (summoner_name,), one=True, db='league_tasks')
     if not player:
         flash("Jugador no encontrado")
-        return redirect(url_for('index'))
+        return redirect(url_for('match_history'))
 
-    puuid = player[0]
+    puuid = player['puuid']
 
-    matches = query_db("SELECT match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items FROM match_history WHERE puuid = ?", (puuid,))
+    # Llamar a store_match_history para actualizar el historial de partidas
+    store_match_history(puuid)
+
+    matches = query_db("SELECT match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items, win FROM match_history WHERE puuid = ? ORDER BY match_date DESC LIMIT 20", (puuid,), db='match_history')
 
     match_data = []
     for match in matches:
+        spells = match['spells']
+        if isinstance(spells, str):
+            spell1, spell2 = spells.split(',')
+        else:
+            spell1, spell2 = "unknown", "unknown"
+
+        items = match['items']
+        if not isinstance(items, str):
+            items = str(items)
+
+        champion_name = champions.get(match['champion_id'], "Unknown Champion")
+
+        # Obtener los IDs de los ítems del diccionario y manejar correctamente los ítems que ya están en formato de cadena
+        item_ids = []
+        for item in items.split(','):
+            try:
+                item_id = int(item)
+            except ValueError:
+                item_id = item
+            item_ids.append(str(item_id))
+
+        # Obtener los IDs de las runas
+        primary_rune_ids = match['primary_runes'].split(',')
+        secondary_rune_ids = match['secondary_runes'].split(',')
+
         match_data.append({
-            "match_date": match[0],
-            "champion_id": match[1],
-            "kills": match[2],
-            "deaths": match[3],
-            "assists": match[4],
-            "total_gold": match[5],
-            "lane": match[6],
-            "primary_runes": match[7],
-            "secondary_runes": match[8],
-            "spells": match[9],
-            "items": match[10],
+            "match_date": match['match_date'],
+            "champion_id": str(match['champion_id']),  # Convertir a cadena
+            "champion_name": champion_name,  # Obtener el nombre del campeón del diccionario
+            "kills": match['kills'],
+            "deaths": match['deaths'],
+            "assists": match['assists'],
+            "total_gold": match['total_gold'],
+            "lane": match['lane'],
+            "primary_runes": primary_rune_ids,  # Pasar los IDs de las runas primarias
+            "secondary_runes": secondary_rune_ids,  # Pasar los IDs de las runas secundarias
+            "spells": spells,
+            "item_list": ','.join(item_ids),  # Convertir la lista de IDs de ítems a una cadena
             "elo": "Gold",  # Placeholder for elo, replace with actual data
-            "champion_icon": f"/path/to/champion/icons/{match[1]}.png",  # Placeholder for champion icon path
-            "spell1_icon": f"/path/to/spell/icons/{match[9].split(',')[0]}.png",  # Placeholder for spell1 icon path
-            "spell2_icon": f"/path/to/spell/icons/{match[9].split(',')[1]}.png",  # Placeholder for spell2 icon path,
-            "result": "Win" if match[2] > match[3] else "Loss"  # Placeholder for result, replace with actual logic
+            "spell1_icon": f"{spell1}.png",  # Placeholder for spell1 icon path
+            "spell2_icon": f"{spell2}.png",  # Placeholder for spell2 icon path,
+            "result": "Win" if match['win'] else "Loss"  # Determinar el resultado de la partida
         })
 
-    return render_template('match_history.html', summoner_name=summoner_name, matches=match_data)
+    print(f"Match data for {summoner_name}: {match_data}")  # Agregar esta línea para depuración
+
+    return render_template('match_history.html', summoner_name=summoner_name, players=players, matches=match_data)
 
 # Inicializar la base de datos y correr la app
 if __name__ == '__main__':
     init_db()
+    init_match_history_db()
     print("Estructura de la tabla de tareas:")
     update_user_roles()
     migrate_db()

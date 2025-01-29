@@ -1,0 +1,20 @@
+SPELLS = {
+    "SummonerBarrier": "Barrier",
+    "SummonerBoost": "Cleanse",
+    "SummonerCherryFlash": "Flash",
+    "SummonerCherryHold": "Flee",
+    "SummonerDot": "Ignite",
+    "SummonerExhaust": "Exhaust",
+    "SummonerFlash": "Flash",
+    "SummonerHaste": "Ghost",
+    "SummonerHeal": "Heal",
+    "SummonerMana": "Clarity",
+    "SummonerPoroRecall": "To the King!",
+    "SummonerPoroThrow": "Poro Toss",
+    "SummonerSmite": "Smite",
+    "SummonerSnowURFSnowball_Mark": "Mark",
+    "SummonerSnowball": "Mark",
+    "SummonerTeleport": "Teleport",
+    "Summoner_UltBookPlaceholder": "Placeholder",
+    "Summoner_UltBookSmitePlaceholder": "Placeholder and Attack-Smite"
+}

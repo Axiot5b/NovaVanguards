@@ -1,18 +1,28 @@
+/* General */
 body {
     font-family: Arial, sans-serif;
-    margin: 20px;
-    background-color: #f4f4f9;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
 }
 
-h1 {
+.container {
+    width: 80%;
+    margin: auto;
+    padding: 20px;
+}
+
+/* Header */
+header {
+    background: #222;
+    color: white;
+    padding: 15px 0;
     text-align: center;
-    margin-bottom: 20px;
 }
 
 nav ul {
-    list-style-type: none;
+    list-style: none;
     padding: 0;
-    text-align: center;
 }
 
 nav ul li {
@@ -21,91 +31,111 @@ nav ul li {
 }
 
 nav ul li a {
+    color: white;
     text-decoration: none;
-    color: #333;
-    font-weight: bold;
 }
 
-nav ul li a:hover {
-    text-decoration: underline;
-}
-
-.content {
-    margin-top: 20px;
-}
-
-.card {
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-h2 {
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 10px;
-}
-
-ul {
-    list-style-type: none;
-    padding: 0;
-}
-
-ul li {
-    margin-bottom: 10px;
+/* Formulario */
+.player-form {
     display: flex;
     align-items: center;
-}
-
-.champion-icon {
-    width: 32px;
-    height: 32px;
-    margin-right: 10px;
-}
-
-.progress-bar {
-    width: 50%;
-    background-color: #f3f3f3;
-    border-radius: 5px;
-    overflow: hidden;
-}
-.progress {
-    height: 20px;
-    border-radius: 5px;
-    text-align: center;
-    color: white;
-    line-height: 20px;
-}
-.progress.orange { background-color: orange; }
-.progress.yellow { background-color: yellow; color: black; }
-.progress.green { background-color: green; }
-
-table {
-    width: 100%;
-    border-collapse: collapse;
+    gap: 10px;
     margin-bottom: 20px;
 }
 
-table th, table td {
-    border: 1px solid #ccc;
-    padding: 10px;
-    text-align: left;
+select, button {
+    padding: 8px;
+    font-size: 16px;
 }
 
-table th {
-    background-color: #f0f0f0;
+/* Match History */
+.match-history {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
 }
 
-.champion-icon {
-    width: 32px;
-    height: 32px;
-    margin-right: 10px;
+.match-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 300px;
+    height: 400px;
+    perspective: 1000px;
+    cursor: pointer;
 }
 
-.kda-positive {
+.card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+}
+
+.match-card.flipped .card-inner {
+    transform: rotateY(180deg);
+}
+
+.card-front, .card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.card-back {
+    transform: rotateY(180deg);
+}
+
+.match-header, .match-footer {
+    text-align: center;
+    font-weight: bold;
+}
+
+.champion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.champion img {
+    width: 50px;
+    height: 50px;
+}
+
+.spells, .build {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.spells img, .build img {
+    width: 30px;
+    height: 30px;
+}
+
+.result.win {
     color: green;
 }
 
-.kda-negative {
+.result.loss {
     color: red;
+}
+
+.runes {
+    text-align: center;
+    padding: 20px;
+}
+
+.runes img {
+    width: 40px;
+    height: 40px;
+    margin: 5px;
 }

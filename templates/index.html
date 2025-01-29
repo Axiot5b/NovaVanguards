@@ -6,16 +6,105 @@
     <title>League Tasks</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <style>
+        /* Logo Container */
         .logo-container {
             position: absolute;
             top: 20px;
             right: 20px;
             display: flex;
-            gap: 10px; /* Espacio entre los logos */
+            gap: 15px;
         }
+
         .logo {
-            width: 100px; /* Ajusta el tamaño de los logos según sea necesario */
+            width: 80px; /* Ajusta el tamaño de los logos */
             height: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .logo:hover {
+            transform: scale(1.1); /* Efecto al pasar el ratón por encima */
+        }
+
+        /* Header */
+        header {
+            background: #222;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+
+        /* Navbar */
+        nav {
+            background-color: #222;
+            padding: 10px 0;
+        }
+
+        nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+
+        nav ul li {
+            display: inline-block;
+            margin: 0 15px;
+        }
+
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        nav ul li a:hover {
+            color: #ffcc00; /* Cambia el color al pasar el ratón */
+        }
+
+        /* Main Content */
+        .content {
+            max-width: 800px;
+            margin: 50px auto;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+        }
+
+        .content h2 {
+            font-size: 2em;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .content p {
+            font-size: 1.2em;
+            line-height: 1.6;
+            color: #555;
+        }
+
+        /* Flash Messages */
+        .flashes {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .flashes li {
+            background: #ffcc00;
+            color: #333;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -24,7 +113,11 @@
         <img src="{{ url_for('static', filename='img/logo_team1.png') }}" alt="Logo Team 1" class="logo">
         <img src="{{ url_for('static', filename='img/logo_team2.png') }}" alt="Logo Team 2" class="logo">
     </div>
-    <h1>League Tasks</h1>
+
+    <header>
+        <h1>League Tasks</h1>
+    </header>
+
     <nav>
         <ul>
             <li><a href="/">Home</a></li>
@@ -41,9 +134,11 @@
             <li><a href="/logout">Logout</a></li>
         </ul>
     </nav>
+
     <div class="content">
         <h2>¡Bienvenido a League Tasks!</h2>
         <p>Supera tus límites. Lleva un seguimiento de tu progreso, completa misiones emocionantes y gana puntos para destacar en Nova Vanguards y The Sector Nova.</p>
+
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 <ul class="flashes">

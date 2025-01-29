@@ -5,9 +5,163 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tasks</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        /* General */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: #222;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+
+        /* Navbar */
+        nav {
+            background-color: #222;
+            padding: 10px 0;
+        }
+
+        nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+
+        nav ul li {
+            display: inline-block;
+            margin: 0 15px;
+        }
+
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        nav ul li a:hover {
+            color: #ffcc00;
+        }
+
+        /* Main Content */
+        .content {
+            max-width: 900px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        .content h2 {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        /* Formulario */
+        form {
+            margin-bottom: 20px;
+        }
+
+        form p {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        form label {
+            font-weight: bold;
+            margin-right: 15px;
+            width: 30%;
+            text-align: right;
+        }
+
+        form input[type="text"],
+        form input[type="number"],
+        form select {
+            width: 65%;
+            padding: 10px;
+            font-size: 1em;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        form input[type="submit"] {
+            background: #007bff;
+            color: white;
+            font-size: 1em;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        form input[type="submit"]:hover {
+            background: #0056b3;
+        }
+
+        /* Tabla */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        table th {
+            background-color: #333;
+            color: white;
+        }
+
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        table tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        button {
+            background: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #a71d2a;
+        }
+    </style>
 </head>
 <body>
-    <h1>Tasks</h1>
+    <header>
+        <h1>Tasks</h1>
+    </header>
+
     <nav>
         <ul>
             <li><a href="/">Home</a></li>
@@ -20,29 +174,30 @@
                 <li><a href="/assign-task">Assign Task</a></li>
                 <li><a href="/update-progress">Update Progress</a></li>
                 <li><a href="/admin">Admin Dashboard</a></li>
-                {% endif %}
-                <li><a href="/logout">Logout</a></li>
+            {% endif %}
+            <li><a href="/logout">Logout</a></li>
         </ul>
     </nav>
-    <div class="content card">
+
+    <div class="content">
         <h2>Create Task</h2>
         <form method="POST" action="{{ url_for('manage_tasks') }}">
             <p>
-                <label for="description">Description</label><br>
-                <input id="description" name="description" required size="32" type="text">
+                <label for="description">Description</label>
+                <input id="description" name="description" required type="text">
             </p>
             <p>
-                <label for="objective_type">Objective Type</label><br>
+                <label for="objective_type">Objective Type</label>
                 <select id="objective_type" name="objective_type" required>
                     <option value="kills">Kills</option>
-                    <option value="average_cs_per_min">average_cs_per_min</option>
-                    <option value="assists">assists</option>
-                    <option value="turret_kills">turret_kills</option>
+                    <option value="average_cs_per_min">Average CS/Min</option>
+                    <option value="assists">Assists</option>
+                    <option value="turret_kills">Turret Kills</option>
                     <option value="damage">Damage</option>
-                    <option value="kill_participation">kill_participation</option>
+                    <option value="kill_participation">Kill Participation</option>
                     <option value="kda">KDA</option>
                     <option value="solo_kills">Solo Kills</option>
-                    <option value="wins">wins</option>
+                    <option value="wins">Wins</option>
                     <option value="dragons">Dragons</option>
                     <option value="barons">Barons</option>
                     <option value="wards_placed">Wards Placed</option>
@@ -50,34 +205,57 @@
                 </select>
             </p>
             <p>
-                <label for="target_value">Target Value</label><br>
-                <input id="target_value" name="target_value" required size="32" type="number" step="0.1">
+                <label for="target_value">Target Value</label>
+                <input id="target_value" name="target_value" required type="number" step="0.1">
             </p>
             <p>
-                <label for="points">Points</label><br>
-                <input id="points" name="points" required size="32" type="number">
+                <label for="points">Points</label>
+                <input id="points" name="points" required type="number">
             </p>
             <p>
-                <label for="champion">Champion (optional)</label><br>
-                <input id="champion" name="champion" size="32" type="text">
+                <label for="champion">Champion (optional)</label>
+                <input id="champion" name="champion" type="text">
             </p>
-            <p><input id="submit" name="submit" type="submit" value="Create Task"></p>
+            <p>
+                <input type="submit" value="Create Task">
+            </p>
         </form>
     </div>
-    <div class="content card">
+
+    <div class="content">
         <h2>Existing Tasks</h2>
-        <ul>
-            {% for task in tasks %}
-                <li>
-                    ID: {{ task[0] }} - {{ task[1] }} - {{ task[2] }} - {{ task[3] }} - {{ task[4] }} - {{ task[5] if task[5] else 'none' }}
-                    <form method="POST" action="{{ url_for('manage_tasks') }}" style="display:inline;">
-                        <input type="hidden" name="task_id" value="{{ task.id }}">
-                        <input type="hidden" name="delete_task" value="1">
-                        <button type="submit">Delete</button>
-                    </form>
-                </li>
-            {% endfor %}
-        </ul>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th>Target</th>
+                    <th>Points</th>
+                    <th>Champion</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr>
+                    <td>{{ task[0] }}</td>
+                    <td>{{ task[1] }}</td>
+                    <td>{{ task[2] }}</td>
+                    <td>{{ task[3] }}</td>
+                    <td>{{ task[4] }}</td>
+                    <td>{{ task[5] if task[5] else 'None' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('manage_tasks') }}" style="display:inline;">
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <input type="hidden" name="delete_task" value="1">
+                            <button type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </body>
 </html>
