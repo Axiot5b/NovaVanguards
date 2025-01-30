@@ -1,4 +1,5 @@
-﻿antiorm==1.2.1
+antiorm==1.2.1
+asgiref==3.8.1
 blinker==1.9.0
 cachelib==0.13.0
 certifi==2024.12.14
@@ -18,10 +19,14 @@ itsdangerous==2.2.0
 Jinja2==3.1.5
 MarkupSafe==3.0.2
 packaging==24.2
+psutil==6.1.1
+psycopg2-binary==2.9.10
 python-dotenv==1.0.0
 pytz==2023.3
 requests==2.31.0
-urllib3==2.3.0
+scout_apm==3.3.0
+urllib3==2.2.3
 Werkzeug==2.3.7
+wrapt==1.17.2
 WTForms==3.0.1
 
