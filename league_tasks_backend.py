@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import requests
 import time
@@ -16,6 +17,9 @@ from items import item_list
 from runes import RUNES
 from spells import SPELLS
 
+# Leer los nombres de las bases de datos desde las variables de entorno
+LEAGUE_TASKS_DB = os.getenv('LEAGUE_TASKS_DB', 'league_tasks.db')
+MATCH_HISTORY_DB = os.getenv('MATCH_HISTORY_DB', 'match_history.db')
 
 # Adaptadores personalizados para datetime
 def adapt_datetime(dt):
