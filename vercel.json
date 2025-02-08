@@ -1,20 +1,16 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "wsgi.py",
-      "use": "@vercel/python"
+  "functions": {
+    "wsgi.py": {
+      "runtime": "@vercel/python",
+      "maxDuration": 60,
+      "memory": 1024
     }
-  ],
+  },
   "routes": [
     {
       "src": "/(.*)",
       "dest": "wsgi.py"
     }
-  ],
-  "functions": {
-    "wsgi.py": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
