@@ -21,6 +21,7 @@ from spells import SPELLS
 LEAGUE_TASKS_DB = os.getenv('LEAGUE_TASKS_DB', 'league_tasks.db')
 MATCH_HISTORY_DB = os.getenv('MATCH_HISTORY_DB', 'match_history.db')
 
+
 # Adaptadores personalizados para datetime
 def adapt_datetime(dt):
     return dt.isoformat()
@@ -33,7 +34,7 @@ sqlite3.register_adapter(datetime, adapt_datetime)
 sqlite3.register_converter("timestamp", convert_timestamp)
 
 # Configuración básica
-API_KEY = "RGAPI-965e8ab6-d0ac-497e-af39-34e84d533792"
+API_KEY = "RGAPI-68903f6f-e823-4f62-993e-a68466928ba4"
 SUMMONER_API_BASE_URL = "https://la1.api.riotgames.com"  # Base URL para datos del jugador (LAN)
 MATCH_API_BASE_URL = "https://americas.api.riotgames.com"  # Base URL para datos de partidas
 DB_NAME = "league_tasks.db"
@@ -44,7 +45,6 @@ app.secret_key = 'your_secret_key'
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-
 
 # Bloqueo para la base de datos
 db_lock = Lock()
@@ -62,33 +62,42 @@ class LoginForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6, max=25)])
     submit = SubmitField('Login')
 
-
-# Formulario de inicio de sesión
-class LoginForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired(), Length(min=4, max=25)])
-    password = PasswordField('Password', validators=[DataRequired(), Length(min=6, max=25)])
-    submit = SubmitField('Login')
-
 # Formulario de registro
 class RegisterForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=4, max=25)])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6, max=25)])
     submit = SubmitField('Register')
 
+class UpdateUserForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=4, max=25)])
+    password = PasswordField('Password', validators=[Length(min=6, max=25)])
+    puuid = StringField('PUUID', validators=[Length(min=0, max=78)])
+    summoner_name = StringField('Summoner Name', validators=[Length(min=0, max=25)])
+    submit = SubmitField('Update')
+
 # Cargar usuario
 @login_manager.user_loader
 def load_user(user_id):
-    user = query_db("SELECT id, username, password, role FROM users WHERE id = ?", (user_id,), one=True)
+    user = query_db("SELECT id, username, password, role, puuid, summoner_name FROM users WHERE id = ?", (user_id,), one=True)
     if user:
-        return User(*user)
+        return User(user['id'], user['username'], user['password'], user['role'], user['puuid'], user['summoner_name'])
     return None
 
 class User(UserMixin):
-    def __init__(self, id, username, password, role):
+    def __init__(self, id, username, password, role, puuid=None, summoner_name=None):
         self.id = id
         self.username = username
         self.password = password
         self.role = role
+        self.puuid = puuid
+        self.summoner_name = summoner_name
+
+    @staticmethod
+    def get(user_id):
+        user = query_db("SELECT id, username, password, role, puuid, summoner_name FROM users WHERE id = ?", (user_id,), one=True)
+        if not user:
+            return None
+        return User(user['id'], user['username'], user['password'], user['role'], user['puuid'], user['summoner_name'])
 
 def admin_required(f):
     @wraps(f)
@@ -119,7 +128,7 @@ def get_match_history_db():
     return conn
 
 # Funciones auxiliares para la base de datos
-def init_db():
+def init_league_tasks_db():
     with db_lock:
         conn = get_db()
         cursor = conn.cursor()
@@ -164,34 +173,42 @@ def init_db():
                 FOREIGN KEY (task_id) REFERENCES tasks(id)
             )
         ''')
-        
-        # Crear tabla users si no existe
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE,
-                password TEXT,
-                role TEXT DEFAULT 'user'
-            )
-        ''')
 
         # Crear tabla player_stats si no existe
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS player_stats (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 puuid TEXT,
+                match_id TEXT,
                 champion_id INTEGER,
-                champion_key TEXT,
-                kills INTEGER DEFAULT 0,
-                deaths INTEGER DEFAULT 0,
-                assists INTEGER DEFAULT 0,
-                win BOOLEAN DEFAULT 0,
+                kills INTEGER,
+                deaths INTEGER,
+                assists INTEGER,
+                win BOOLEAN,
+                team_id INTEGER,
+                gold INTEGER,
+                damage INTEGER,
+                turret_kills INTEGER DEFAULT 0,
+                cs INTEGER DEFAULT 0,
+                wards_placed INTEGER DEFAULT 0,
+                atakhan_kills INTEGER DEFAULT 0,
+                inhibitor_kills INTEGER DEFAULT 0,
+                solo_kills INTEGER DEFAULT 0,
+                dragons INTEGER DEFAULT 0,
+                barons INTEGER DEFAULT 0,
+                vision_score INTEGER DEFAULT 0,
+                wards_destroyed INTEGER DEFAULT 0,
+                wins INTEGER DEFAULT 0,
+                match_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (puuid) REFERENCES players(puuid)
             )
         ''')
 
         conn.commit()
         conn.close()
+
+    # Verificar y agregar columnas faltantes
+    check_and_add_column()
 
 def init_match_history_db():
     with db_lock:
@@ -220,14 +237,99 @@ def init_match_history_db():
             )
         ''')
 
-        # Verificar si la columna win existe, si no, agregarla
-        cursor.execute("PRAGMA table_info(match_history)")
-        columns = [column[1] for column in cursor.fetchall()]
-        if 'win' not in columns:
-            cursor.execute("ALTER TABLE match_history ADD COLUMN win BOOLEAN")
+        # Crear tabla champion_stats si no existe
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS champion_stats (
+                puuid TEXT,
+                champion_id INTEGER,
+                games_played INTEGER,
+                total_kills INTEGER,
+                total_deaths INTEGER,
+                total_assists INTEGER,
+                total_wins INTEGER,
+                total_gold INTEGER,
+                total_damage INTEGER,
+                PRIMARY KEY (puuid, champion_id)
+            )
+        ''')
+
+        # Crear tabla processed_matches si no existe
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS processed_matches (
+                match_id TEXT PRIMARY KEY
+            )
+        ''')
 
         conn.commit()
         conn.close()
+
+def create_player_stats_table():
+    conn = sqlite3.connect('league_tasks.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS player_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            puuid TEXT,
+            match_id TEXT,
+            champion_id INTEGER,
+            kills INTEGER,
+            deaths INTEGER,
+            assists INTEGER,
+            win BOOLEAN,
+            team_id INTEGER,
+            gold INTEGER,
+            damage INTEGER,
+            turret_kills INTEGER DEFAULT 0,
+            cs INTEGER DEFAULT 0,
+            wards_placed INTEGER DEFAULT 0,
+            atakhan_kills INTEGER DEFAULT 0,
+            inhibitor_kills INTEGER DEFAULT 0,
+            solo_kills INTEGER DEFAULT 0,
+            dragons INTEGER DEFAULT 0,
+            barons INTEGER DEFAULT 0,
+            vision_score INTEGER DEFAULT 0,
+            wards_destroyed INTEGER DEFAULT 0,
+            wins INTEGER DEFAULT 0,
+            game_time INTEGER DEFAULT 0,
+            total_team_kills INTEGER DEFAULT 0,
+            match_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (puuid) REFERENCES players(puuid)
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def add_game_time_column():
+    create_player_stats_table()
+    conn = sqlite3.connect('league_tasks.db')
+    cursor = conn.cursor()
+    
+    # Verificar si la columna game_time ya existe
+    cursor.execute("PRAGMA table_info(player_stats)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'game_time' not in columns:
+        cursor.execute("ALTER TABLE player_stats ADD COLUMN game_time INTEGER DEFAULT 0")
+    
+    conn.commit()
+    conn.close()
+
+add_game_time_column()
+
+def add_total_team_kills_column():
+    create_player_stats_table()
+    conn = sqlite3.connect('league_tasks.db')
+    cursor = conn.cursor()
+    
+    # Verificar si la columna total_team_kills ya existe
+    cursor.execute("PRAGMA table_info(player_stats)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'total_team_kills' not in columns:
+        cursor.execute("ALTER TABLE player_stats ADD COLUMN total_team_kills INTEGER DEFAULT 0")
+    
+    conn.commit()
+    conn.close()
+
+add_total_team_kills_column()
 
 def migrate_db():
     with db_lock:
@@ -240,15 +342,16 @@ def migrate_db():
         if 'match_id' not in columns:
             cursor.execute("ALTER TABLE match_history ADD COLUMN match_id TEXT UNIQUE")
 
-        # Verificar si las columnas kills, deaths, assists existen en player_stats, si no, agregarlas
+        # Verificar si las columnas necesarias existen en player_stats
         cursor.execute("PRAGMA table_info(player_stats)")
         columns = [column[1] for column in cursor.fetchall()]
-        if 'kills' not in columns:
-            cursor.execute("ALTER TABLE player_stats ADD COLUMN kills INTEGER DEFAULT 0")
-        if 'deaths' not in columns:
-            cursor.execute("ALTER TABLE player_stats ADD COLUMN deaths INTEGER DEFAULT 0")
-        if 'assists' not in columns:
-            cursor.execute("ALTER TABLE player_stats ADD COLUMN assists INTEGER DEFAULT 0")
+        required_columns = [
+            'kills', 'deaths', 'assists', 'turret_kills', 'cs', 'wards_placed', 'atakhan_kills',
+            'inhibitor_kills', 'solo_kills', 'dragons', 'barons', 'vision_score', 'wards_destroyed', 'wins'
+        ]
+        for col in required_columns:
+            if col not in columns:
+                cursor.execute(f"ALTER TABLE player_stats ADD COLUMN {col} INTEGER DEFAULT 0")
 
         conn.commit()
         conn.close()
@@ -283,6 +386,32 @@ def query_db(query, args=(), one=False, db='league_tasks'):
         conn.close()
         return (rv[0] if rv else None) if one else rv
     
+def check_and_add_column():
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verificar si las columnas necesarias existen en player_stats
+        cursor.execute("PRAGMA table_info(player_stats)")
+        columns = [column[1] for column in cursor.fetchall()]
+        required_columns = [
+            'turret_kills', 'cs', 'wards_placed', 'atakhan_kills', 'inhibitor_kills',
+            'solo_kills', 'dragons', 'barons', 'vision_score', 'wards_destroyed', 'wins', 'match_date'
+        ]
+        for col in required_columns:
+            if col not in columns:
+                if col == 'match_date':
+                    cursor.execute(f"ALTER TABLE player_stats ADD COLUMN {col} TIMESTAMP")
+                else:
+                    cursor.execute(f"ALTER TABLE player_stats ADD COLUMN {col} INTEGER DEFAULT 0")
+
+        # Actualizar los valores de la columna match_date a CURRENT_TIMESTAMP si es necesario
+        if 'match_date' not in columns:
+            cursor.execute("UPDATE player_stats SET match_date = CURRENT_TIMESTAMP WHERE match_date IS NULL")
+
+        conn.commit()
+        conn.close()
+
 def match_ids(summoner_name):
     # Obtener el PUUID del jugador
     summoner_url = f"{MATCH_API_BASE_URL}/lol/summoner/v4/summoners/by-name/{summoner_name}"
@@ -407,14 +536,23 @@ def manage_tasks():
             points = request.form.get('points')
             champion = request.form.get('champion')
 
+            # Verificar si el ID del campeón es válido
+            if champion and not champion.isdigit():
+                flash("El ID del campeón debe ser un número.")
+                return redirect(url_for('manage_tasks'))
+
             query_db("""
                 INSERT INTO tasks (description, objective_type, target_value, points, champion)
                 VALUES (?, ?, ?, ?, ?)
-            """, (description, objective_type, target_value, points, champion if champion else None))
+            """, (description, objective_type, target_value, points, int(champion) if champion else None))
 
             flash("Tarea creada con éxito")
         
         return redirect(url_for('manage_tasks'))
+
+    elif request.method == 'GET':
+        tasks = query_db("SELECT id, description, objective_type, target_value, points, champion FROM tasks")
+        return render_template('tasks.html', tasks=tasks)
 
     elif request.method == 'GET':
         tasks = query_db("SELECT id, description, objective_type, target_value, points, champion FROM tasks")
@@ -475,12 +613,13 @@ def assign_task():
         summoner_name = request.form.get('summoner_name')
         task_id = request.form.get('task_id')
 
-        player = query_db("SELECT id FROM players WHERE summoner_name = ?", (summoner_name,), one=True)
+        player = query_db("SELECT id, puuid FROM players WHERE summoner_name = ?", (summoner_name,), one=True)
         if not player:
             flash("Jugador no encontrado")
             return redirect(url_for('assign_task'))
 
-        player_id = player[0]
+        player_id = player['id']
+        puuid = player['puuid']
         query_db("INSERT INTO assigned_tasks (player_id, task_id) VALUES (?, ?)", (player_id, task_id))
 
         flash("Tarea asignada con éxito")
@@ -490,17 +629,55 @@ def assign_task():
     players = query_db("SELECT summoner_name FROM players")
     return render_template('assign_task.html', tasks=tasks, players=players)
 
-# Implementación de la función para obtener estadísticas del jugador
-def get_player_stats(puuid):
+def get_player_stats(puuid, last_update):
+    # Obtener estadísticas acumuladas existentes
+    existing_stats_row = query_db("""
+        SELECT SUM(kills) as kills, SUM(deaths) as deaths, SUM(assists) as assists, SUM(turret_kills) as turret_kills,
+               SUM(cs) as cs, SUM(damage) as damage, SUM(wins) as wins, COUNT(*) as games, SUM(wards_placed) as wards_placed,
+               SUM(gold) as gold, SUM(atakhan_kills) as atakhan_kills, SUM(inhibitor_kills) as inhibitor_kills,
+               SUM(solo_kills) as solo_kills, SUM(dragons) as dragons, SUM(barons) as barons, SUM(vision_score) as vision_score,
+               SUM(wards_destroyed) as wards_destroyed, SUM(game_time) as game_time, MAX(champion_id) as champion_id,
+               SUM(total_team_kills) as total_team_kills
+        FROM player_stats
+        WHERE puuid = ?
+    """, (puuid,), one=True)
+
+    existing_stats = {key: (value if value is not None else 0) for key, value in dict(existing_stats_row).items()} if existing_stats_row else {
+        'kills': 0,
+        'deaths': 0,
+        'assists': 0,
+        'turret_kills': 0,
+        'cs': 0,
+        'damage': 0,
+        'wins': 0,
+        'games': 0,
+        'wards_placed': 0,
+        'gold': 0,
+        'atakhan_kills': 0,
+        'inhibitor_kills': 0,
+        'solo_kills': 0,
+        'dragons': 0,
+        'barons': 0,
+        'vision_score': 0,
+        'wards_destroyed': 0,
+        'game_time': 0,
+        'champion_id': 0,
+        'total_team_kills': 0,
+        'average_cs_per_min': 0,
+        'kill_participation': 0,
+        'vision_score_per_min': 0,
+        'kda': 0  # Asegurarse de que esta clave esté presente
+    }
+
     match_list_url = f"{MATCH_API_BASE_URL}/lol/match/v5/matches/by-puuid/{puuid}/ids?start=0&count=40"
     headers = {"X-Riot-Token": API_KEY}
     match_list_response = requests.get(match_list_url, headers=headers)
 
     if match_list_response.status_code != 200:
-        return {}
+        return existing_stats
 
     match_ids = match_list_response.json()
-    stats = {
+    new_stats = {
         'kills': 0,
         'deaths': 0,
         'assists': 0,
@@ -518,16 +695,20 @@ def get_player_stats(puuid):
         'dragons': 0,
         'barons': 0,
         'champion_id': 0,
-        'kda': 0,
-        'average_cs_per_min': 0,
         'total_team_kills': 0,
-        'kill_participation': 0,
         'vision_score': 0,
         'wards_destroyed': 0,
-        'vision_score_per_min': 0
+        'average_cs_per_min': 0,
+        'vision_score_per_min': 0,
+        'kda': 0  # Asegurarse de que esta clave esté presente
     }
 
     for match_id in match_ids:
+        # Verificar si la partida ya ha sido procesada
+        existing_match = query_db("SELECT 1 FROM player_stats WHERE match_id = ?", (match_id,), one=True)
+        if existing_match:
+            continue
+
         match_url = f"{MATCH_API_BASE_URL}/lol/match/v5/matches/{match_id}"
         match_response = requests.get(match_url, headers=headers)
 
@@ -550,101 +731,171 @@ def get_player_stats(puuid):
         team_id = player_stats['teamId']
         team_kills = sum(p['kills'] for p in participants if p['teamId'] == team_id)
 
-        stats['kills'] += player_stats.get('kills', 0)
-        stats['deaths'] += player_stats.get('deaths', 0)
-        stats['assists'] += player_stats.get('assists', 0)
-        stats['turret_kills'] += player_stats.get('turretKills', 0)
-        stats['cs'] += player_stats.get('totalMinionsKilled', 0) + player_stats.get('neutralMinionsKilled', 0)
-        stats['damage'] += player_stats.get('totalDamageDealtToChampions', 0)
-        stats['wins'] += 1 if player_stats.get('win', False) else 0
-        stats['games'] += 1
-        stats['game_time'] += match_data['info']['gameDuration']
-        stats['wards_placed'] += player_stats.get('wardsPlaced', 0)
-        stats['gold'] += player_stats.get('goldEarned', 0)
-        stats['atakhan_kills'] += player_stats.get('challenges', {}).get('atakhanKills', 0)
-        stats['inhibitor_kills'] += player_stats.get('inhibitorKills', 0)
-        stats['solo_kills'] += player_stats.get('challenges', {}).get('soloKills', 0)
-        stats['dragons'] += player_stats.get('dragonKills', 0)
-        stats['barons'] += player_stats.get('baronKills', 0)
-        stats['champion_id'] = player_stats.get('championId', 0)
-        stats['total_team_kills'] += team_kills
-        stats['vision_score'] += player_stats.get('visionScore', 0)
-        stats['wards_destroyed'] += player_stats.get('wardTakedowns', 0)
+        new_stats['kills'] += player_stats.get('kills', 0)
+        new_stats['deaths'] += player_stats.get('deaths', 0)
+        new_stats['assists'] += player_stats.get('assists', 0)
+        new_stats['turret_kills'] += player_stats.get('turretKills', 0)
+        new_stats['cs'] += player_stats.get('totalMinionsKilled', 0) + player_stats.get('neutralMinionsKilled', 0)
+        new_stats['damage'] += player_stats.get('totalDamageDealtToChampions', 0)
+        new_stats['games'] += 1
+        new_stats['game_time'] += match_data['info']['gameDuration']
+        new_stats['wards_placed'] += player_stats.get('wardsPlaced', 0)
+        new_stats['gold'] += player_stats.get('goldEarned', 0)
+        new_stats['atakhan_kills'] += player_stats.get('challenges', {}).get('atakhanKills', 0)
+        new_stats['inhibitor_kills'] += player_stats.get('inhibitorKills', 0)
+        new_stats['solo_kills'] += player_stats.get('challenges', {}).get('soloKills', 0)
+        new_stats['dragons'] += player_stats.get('dragonKills', 0)
+        new_stats['barons'] += player_stats.get('baronKills', 0)
+        new_stats['champion_id'] = player_stats.get('championId', 0)
+        new_stats['total_team_kills'] += team_kills
+        new_stats['vision_score'] += player_stats.get('visionScore', 0)
+        new_stats['wards_destroyed'] += player_stats.get('wardTakedowns', 0)
+
+        # Determinar si el equipo del jugador ganó
+        team_won = any(team['win'] for team in match_data['info']['teams'] if team['teamId'] == team_id)
+        if team_won:
+            new_stats['wins'] += 1
 
         # Insertar datos en la tabla player_stats
-        query_db("INSERT INTO player_stats (puuid, champion_id, champion_key, kills, deaths, assists, win) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                 (puuid, player_stats.get('championId', 0), player_stats.get('championName', ''), player_stats.get('kills', 0), player_stats.get('deaths', 0), player_stats.get('assists', 0), player_stats.get('win', False)))
+        query_db("INSERT INTO player_stats (puuid, match_id, champion_id, kills, deaths, assists, win, team_id, gold, damage, turret_kills, cs, wards_placed, atakhan_kills, inhibitor_kills, solo_kills, dragons, barons, vision_score, wards_destroyed, game_time, match_date, total_team_kills) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 (puuid, match_id, player_stats.get('championId', 0), player_stats.get('kills', 0), player_stats.get('deaths', 0), player_stats.get('assists', 0), team_won, player_stats.get('teamId', 0), player_stats.get('goldEarned', 0), player_stats.get('totalDamageDealtToChampions', 0), player_stats.get('turretKills', 0), player_stats.get('totalMinionsKilled', 0) + player_stats.get('neutralMinionsKilled', 0), player_stats.get('wardsPlaced', 0), player_stats.get('challenges', {}).get('atakhanKills', 0), player_stats.get('inhibitorKills', 0), player_stats.get('challenges', {}).get('soloKills', 0), player_stats.get('dragonKills', 0), player_stats.get('baronKills', 0), player_stats.get('visionScore', 0), player_stats.get('wardTakedowns', 0), match_data['info']['gameDuration'], datetime.fromtimestamp(match_data['info']['gameCreation'] / 1000), team_kills))
+
+    # Acumular estadísticas existentes con las nuevas estadísticas
+    for key in new_stats:
+        if key in existing_stats:
+            existing_stats[key] += new_stats[key]
+        else:
+            existing_stats[key] = new_stats[key]
 
     # Calcular visionScorePerMinute acumulado
-    if stats['game_time'] > 0:
-        stats['vision_score_per_min'] = round(stats['vision_score'] / (stats['game_time'] / 60), 2)
+    if existing_stats['game_time'] > 0:
+        existing_stats['vision_score_per_min'] = round(existing_stats['vision_score'] / (existing_stats['game_time'] / 60), 2)
 
     # Calcular KDA
-    stats['kda'] = round((stats['kills'] + stats['assists']) / max(1, stats['deaths']), 2)
+    existing_stats['kda'] = round((existing_stats['kills'] + existing_stats['assists']) / max(1, existing_stats['deaths']), 2)
+
+    # Calcular CS por minuto
+    existing_stats['average_cs_per_min'] = round((existing_stats['cs'] / (existing_stats['game_time'] / 60)), 2) if existing_stats['game_time'] > 0 else 0
+
+    # Calcular participación en asesinatos
+    if existing_stats['total_team_kills'] > 0:
+        existing_stats['kill_participation'] = round(((existing_stats['kills'] + existing_stats['assists']) / existing_stats['total_team_kills']) * 100, 2)
+    else:
+        existing_stats['kill_participation'] = 0
+
+    # Calcular win ratio
+    existing_stats['win_ratio'] = round((existing_stats['wins'] / max(1, existing_stats['games'])) * 100, 2) if existing_stats['games'] > 0 else 0.0
+
+    print(f"Stats: {existing_stats}")
+
+    return existing_stats
+
+def get_champion_stats(puuid, champion_id):
+    stats = query_db("""
+        SELECT SUM(kills) as kills, SUM(deaths) as deaths, SUM(assists) as assists, SUM(turret_kills) as turret_kills,
+               SUM(cs) as cs, SUM(damage) as damage, SUM(wins) as wins, COUNT(*) as games, SUM(wards_placed) as wards_placed,
+               SUM(gold) as gold, SUM(atakhan_kills) as atakhan_kills, SUM(inhibitor_kills) as inhibitor_kills,
+               SUM(solo_kills) as solo_kills, SUM(dragons) as dragons, SUM(barons) as barons, SUM(vision_score) as vision_score,
+               SUM(wards_destroyed) as wards_destroyed, SUM(game_time) as game_time
+        FROM player_stats
+        WHERE puuid = ? AND champion_id = ?
+    """, (puuid, champion_id), one=True)
+
+    if not stats:
+        return {
+            'kills': 0,
+            'deaths': 0,
+            'assists': 0,
+            'turret_kills': 0,
+            'cs': 0,
+            'damage': 0,
+            'wins': 0,
+            'games': 0,
+            'wards_placed': 0,
+            'gold': 0,
+            'atakhan_kills': 0,
+            'inhibitor_kills': 0,
+            'solo_kills': 0,
+            'dragons': 0,
+            'barons': 0,
+            'vision_score': 0,
+            'wards_destroyed': 0,
+            'game_time': 0,
+            'total_team_kills': 0,
+            'kill_participation': 0,
+            'average_cs_per_min': 0,
+            'vision_score_per_min': 0,
+            'kda': 0  # Asegurarse de que esta clave esté presente
+        }
+
+    stats = {key: (value if value is not None else 0) for key, value in dict(stats).items()}
+
+    # Calcular total_team_kills (sin filtrar por fecha)
+    total_team_kills = query_db("""
+        SELECT SUM(kills) as total_team_kills
+        FROM player_stats
+        WHERE puuid = ? AND champion_id = ?
+    """, (puuid, champion_id), one=True)['total_team_kills'] or 0
+
+    stats['total_team_kills'] = total_team_kills
+    stats['kill_participation'] = round(((stats['kills'] + stats['assists']) / total_team_kills) * 100, 2) if total_team_kills > 0 else 0
 
     # Calcular CS por minuto
     stats['average_cs_per_min'] = round((stats['cs'] / (stats['game_time'] / 60)), 2) if stats['game_time'] > 0 else 0
 
-    # Calcular participación en asesinatos
-    if stats['total_team_kills'] > 0:
-        stats['kill_participation'] = round(((stats['kills'] + stats['assists']) / stats['total_team_kills']) * 100, 2)
-
-    # Calcular win ratio
-    stats['win_ratio'] = round((stats['wins'] / max(1, stats['games'])) * 100, 2) if stats['games'] > 0 else 0.0
-
-    print(f"Stats: {stats}")
+    # Calcular KDA
+    stats['kda'] = round((stats['kills'] + stats['assists']) / max(1, stats['deaths']), 2)
 
     return stats
 
-
 def calculate_task_progress(task, stats):
     assigned_task_id, task_id, description, objective_type, target_value, points, progress, is_completed, champion, assigned_date = task
-    champion_id = stats['champion_id']
 
     if objective_type == 'kills':
-        progress = stats['kills'] if not champion or champion_id == champion else 0
+        progress = stats['kills']
     elif objective_type == 'deaths':
-        progress = stats['deaths'] if not champion or champion_id == champion else 0
+        progress = stats['deaths']
     elif objective_type == 'assists':
-        progress = stats['assists'] if not champion or champion_id == champion else 0
+        progress = stats['assists']
     elif objective_type == 'turret_kills':
-        progress = stats['turret_kills'] if not champion or champion_id == champion else 0
+        progress = stats['turret_kills']
     elif objective_type == 'cs':
-        progress = stats['cs'] if not champion or champion_id == champion else 0
+        progress = stats['cs']
     elif objective_type == 'damage':
-        progress = stats['damage'] if not champion or champion_id == champion else 0
+        progress = stats['damage']
     elif objective_type == 'wins':
-        progress = stats['wins'] if not champion or champion_id == champion else 0
+        progress = stats['wins']
     elif objective_type == 'games':
-        progress = stats['games'] if not champion or champion_id == champion else 0
+        progress = stats['games']
     elif objective_type == 'wards_placed':
-        progress = stats['wards_placed'] if not champion or champion_id == champion else 0
+        progress = stats['wards_placed']
     elif objective_type == 'gold':
-        progress = stats['gold'] if not champion or champion_id == champion else 0
+        progress = stats['gold']
     elif objective_type == 'atakhan_kills':
-        progress = stats['atakhan_kills'] if not champion or champion_id == champion else 0
+        progress = stats['atakhan_kills']
     elif objective_type == 'inhibitor_kills':
-        progress = stats['inhibitor_kills'] if not champion or champion_id == champion else 0
+        progress = stats['inhibitor_kills']
     elif objective_type == 'solo_kills':
-        progress = stats['solo_kills'] if not champion or champion_id == champion else 0
+        progress = stats['solo_kills']
     elif objective_type == 'dragons':
-        progress = stats['dragons'] if not champion or champion_id == champion else 0
+        progress = stats['dragons']
     elif objective_type == 'barons':
-        progress = stats['barons'] if not champion or champion_id == champion else 0
+        progress = stats['barons']
     elif objective_type == 'kda':
-        progress = stats['kda'] if not champion or champion_id == champion else 0
+        progress = stats['kda']
     elif objective_type == 'average_cs_per_min':
-        progress = stats['average_cs_per_min'] if not champion or champion_id == champion else 0
+        progress = stats['average_cs_per_min']
     elif objective_type == 'kill_participation':
-        progress = stats['kill_participation'] if not champion or champion_id == champion else 0
+        progress = stats.get('kill_participation', 0)
     elif objective_type == 'vision_score':
-        progress = stats['vision_score'] if not champion or champion_id == champion else 0
+        progress = stats['vision_score']
     elif objective_type == 'vision_score_per_min':
-        progress = stats['vision_score_per_min'] if not champion or champion_id == champion else 0
+        progress = stats['vision_score_per_min']
     elif objective_type == 'wards_destroyed':
-        progress = stats['wards_destroyed'] if not champion or champion_id == champion else 0
+        progress = stats['wards_destroyed']
     elif objective_type == 'use_specific_champion':
-        progress = 1 if champion_id == champion else 0
+        # Esta lógica puede necesitar ajustes dependiendo de cómo se implemente
+        progress = 1 if stats.get('games', 0) > 0 else 0
 
     return round(progress, 2), is_completed
 
@@ -742,6 +993,89 @@ def store_match_history(puuid):
     except Exception as e:
         print(f"Error deleting old matches for PUUID {puuid}: {e}")
 
+def calculate_champion_stats(puuid):
+    headers = {"X-Riot-Token": API_KEY}
+    match_ids = []
+
+    # Obtener un total de 20 partidas combinadas entre soloQ y flex
+    match_list_url = f"{MATCH_API_BASE_URL}/lol/match/v5/matches/by-puuid/{puuid}/ids?start=0&count=20"
+    match_list_response = requests.get(match_list_url, headers=headers)
+    if match_list_response.status_code == 200:
+        match_ids.extend(match_list_response.json())
+    else:
+        print(f"Error al obtener la lista de partidas para el PUUID {puuid}: {match_list_response.status_code} - {match_list_response.text}")
+
+    stats = {}
+
+    for match_id in match_ids:
+        # Verificar si la partida ya ha sido procesada
+        processed_match = query_db("SELECT 1 FROM processed_matches WHERE match_id = ?", (match_id,), one=True, db='match_history')
+        if processed_match:
+            continue
+
+        match_url = f"{MATCH_API_BASE_URL}/lol/match/v5/matches/{match_id}"
+        success = False
+        retries = 0
+        while not success and retries < 5:
+            match_response = requests.get(match_url, headers=headers)
+            if match_response.status_code == 200:
+                success = True
+            elif match_response.status_code == 429:
+                print(f"Rate limit exceeded. Reintentando en 10 segundos...")
+                time.sleep(10)
+                retries += 1
+            else:
+                print(f"Error al obtener los datos de la partida {match_id}: {match_response.status_code} - {match_response.text}")
+                break
+
+        if not success:
+            continue
+
+        match_data = match_response.json()
+        participants = match_data['info']['participants']
+        player_stats = next((p for p in participants if p['puuid'] == puuid), None)
+
+        if not player_stats:
+            print(f"No se encontraron estadísticas para el jugador con PUUID {puuid} en la partida {match_id}")
+            continue
+
+        champion_id = player_stats['championId']
+        if champion_id not in stats:
+            stats[champion_id] = {
+                'games_played': 0,
+                'total_kills': 0,
+                'total_deaths': 0,
+                'total_assists': 0,
+                'total_wins': 0,
+                'total_gold': 0,
+                'total_damage': 0
+            }
+
+        stats[champion_id]['games_played'] += 1
+        stats[champion_id]['total_kills'] += player_stats.get('kills', 0)
+        stats[champion_id]['total_deaths'] += player_stats.get('deaths', 0)
+        stats[champion_id]['total_assists'] += player_stats.get('assists', 0)
+        stats[champion_id]['total_gold'] += player_stats.get('goldEarned', 0)
+        stats[champion_id]['total_damage'] += player_stats.get('totalDamageDealtToChampions', 0)
+        if player_stats.get('win', False):
+            stats[champion_id]['total_wins'] += 1
+
+        # Marcar la partida como procesada
+        query_db("INSERT INTO processed_matches (match_id) VALUES (?)", (match_id,), db='match_history')
+
+    # Guardar los datos en la base de datos match_history.db
+    for champion_id, champ_stats in stats.items():
+        query_db('''
+            INSERT OR REPLACE INTO champion_stats (puuid, champion_id, games_played, total_kills, total_deaths, total_assists, total_wins, total_gold, total_damage)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (puuid, champion_id, champ_stats['games_played'], champ_stats['total_kills'], champ_stats['total_deaths'], champ_stats['total_assists'], champ_stats['total_wins'], champ_stats['total_gold'], champ_stats['total_damage']), db='match_history')
+
+    for champ_stats in stats.values():
+        champ_stats['kda'] = round((champ_stats['total_kills'] + champ_stats['total_assists']) / max(1, champ_stats['total_deaths']), 2)
+        champ_stats['win_ratio'] = round((champ_stats['total_wins'] / champ_stats['games_played']) * 100, 2) if champ_stats['games_played'] > 0 else 0
+
+    return stats
+
 # Endpoint para actualizar el progreso de las tareas
 @app.route('/update-progress', methods=['POST', 'GET'])
 @login_required
@@ -750,18 +1084,16 @@ def update_progress():
     if request.method == 'POST':
         summoner_name = request.form.get('summoner_name')
 
-        player = query_db("SELECT puuid FROM players WHERE summoner_name = ?", (summoner_name,), one=True)
+        player = query_db("SELECT puuid, last_update FROM players WHERE summoner_name = ?", (summoner_name,), one=True)
         if not player:
             flash("Jugador no encontrado")
             return redirect(url_for('update_progress'))
 
-        puuid = player[0]
+        puuid, last_update = player
 
         # Obtener estadísticas del jugador una sola vez
-        stats = get_player_stats(puuid)
-        if not stats:
-            flash("No se pudieron obtener las partidas recientes.")
-            return redirect(url_for('update_progress'))
+        player_stats = get_player_stats(puuid, last_update)
+        champion_stats = {}
 
         assigned_tasks = query_db("""
             SELECT at.id, t.id, t.description, t.objective_type, t.target_value, t.points, at.progress, at.is_completed, t.champion, at.assigned_date 
@@ -773,23 +1105,32 @@ def update_progress():
         
         updated_tasks = []
         for task in assigned_tasks:
+            if task[8]:  # Si la tarea tiene un campeón específico
+                if task[8] not in champion_stats:
+                    champion_stats[task[8]] = get_champion_stats(puuid, task[8])  # Eliminado last_update
+                stats = champion_stats[task[8]]
+            else:
+                stats = player_stats
+
             progress, is_completed = calculate_task_progress(task, stats)
 
-            if progress >= float(task[4]):  # task[4] es target_value
-                is_completed = True
-                query_db("UPDATE players SET points = points + ? WHERE id = (SELECT id FROM players WHERE summoner_name = ?)", (task[5], summoner_name))  # task[5] es points
+            # No acumular el progreso existente si no es necesario
+            new_progress = progress
 
-            query_db("UPDATE assigned_tasks SET progress = ?, is_completed = ? WHERE id = ?", (round(progress, 2), is_completed, task[0]))  # task[0] es assigned_task_id
+            if new_progress >= float(task[4]):
+                is_completed = True
+                query_db("UPDATE players SET points = points + ? WHERE id = (SELECT id FROM players WHERE summoner_name = ?)", (task[5], summoner_name))
+
+            query_db("UPDATE assigned_tasks SET progress = ?, is_completed = ? WHERE id = ?", (round(new_progress, 2), is_completed, task[0]))
             updated_tasks.append({
-                "description": task[2],  # task[2] es description
-                "progress": (round(progress, 2)),  # Redondear y convertir a entero
+                "description": task[2],
+                "progress": round(new_progress, 2),
                 "is_completed": bool(is_completed),
-                "target_value": float(task[4]),  # task[4] es target_value
-                "kill_participation": stats.get('kill_participation', 0)  # Agregar kill participation
+                "target_value": float(task[4]),
+                "kill_participation": stats.get('kill_participation', 0)
             })
 
-        # Almacenar el historial de partidas
-        store_match_history(puuid)
+        query_db("UPDATE players SET last_update = CURRENT_TIMESTAMP WHERE puuid = ?", (puuid,))
 
         flash("Progreso actualizado")
         return render_template('update_progress.html', updated_tasks=updated_tasks)
@@ -799,12 +1140,21 @@ def update_progress():
 @app.route('/players-tasks', methods=['GET'])
 @login_required
 def get_players_tasks():
-    players_tasks = query_db("""
-        SELECT p.id as player_id, p.summoner_name, t.id as task_id, t.description, at.progress, at.is_completed, t.target_value
-        FROM players p
-        JOIN assigned_tasks at ON p.id = at.player_id
-        JOIN tasks t ON at.task_id = t.id
-    """)
+    if current_user.role == 'admin':
+        players_tasks = query_db("""
+            SELECT p.id as player_id, p.summoner_name, t.id as task_id, t.description, at.progress, at.is_completed, t.target_value
+            FROM players p
+            JOIN assigned_tasks at ON p.id = at.player_id
+            JOIN tasks t ON at.task_id = t.id
+        """)
+    else:
+        players_tasks = query_db("""
+            SELECT p.id as player_id, p.summoner_name, t.id as task_id, t.description, at.progress, at.is_completed, t.target_value
+            FROM players p
+            JOIN assigned_tasks at ON p.id = at.player_id
+            JOIN tasks t ON at.task_id = t.id
+            WHERE p.puuid = ? OR p.summoner_name = ?
+        """, (current_user.puuid, current_user.summoner_name))
 
     result = {}
     for player_task in players_tasks:
@@ -815,12 +1165,46 @@ def get_players_tasks():
             "player_id": player_id,
             "id": task_id,
             "description": description,
-            "progress": (round(progress, 2)),  # Redondear y convertir a entero
+            "progress": round(progress, 2),  # Redondear y convertir a entero
             "is_completed": bool(is_completed),
             "target_value": float(target_value)
         })
 
     return render_template('players_tasks.html', players_tasks=result)
+
+@app.route('/update-user', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def update_user():
+    if request.method == 'POST':
+        user_id = request.form.get('user_id')
+        puuid = request.form.get('puuid')
+        summoner_name = request.form.get('summoner_name')
+
+        query_db(
+            "UPDATE users SET puuid = ?, summoner_name = ? WHERE id = ?",
+            (puuid, summoner_name, user_id)
+        )
+        flash('Usuario actualizado correctamente.')
+        return redirect(url_for('admin_dashboard'))
+
+    user_id = request.args.get('user_id')
+    users = query_db("SELECT id, username FROM users ORDER BY username")
+    players = query_db("SELECT puuid, summoner_name FROM players ORDER BY summoner_name")
+
+    user = None
+    if user_id:
+        user = query_db("SELECT id, username, puuid, summoner_name FROM users WHERE id = ?", (user_id,), one=True)
+    
+    if not user:
+        user = {
+            'id': '',
+            'username': '',
+            'puuid': '',
+            'summoner_name': ''
+        }
+
+    return render_template('update_user.html', users=users, players=players, user=user, user_id=user_id)
 
 # Ruta para desasignar una tarea
 @app.route('/unassign-task', methods=['POST'])
@@ -841,30 +1225,104 @@ def unassign_task():
 @app.route('/players-champs', methods=['GET'])
 @login_required
 def get_players_champs():
-    players_champs = query_db("""
-        SELECT p.summoner_name, ps.champion_id, COUNT(ps.champion_id) as count,
-               SUM(ps.kills) as total_kills, SUM(ps.deaths) as total_deaths, SUM(ps.assists) as total_assists
-        FROM players p
-        JOIN player_stats ps ON p.puuid = ps.puuid
-        GROUP BY p.summoner_name, ps.champion_id
-    """)
+    # Obtener jugadores de league_tasks.db
+    players = query_db("SELECT summoner_name, profile_icon_id, puuid FROM players", db='league_tasks')
 
     result = {}
-    for player_champ in players_champs:
-        summoner_name, champion_id, count, total_kills, total_deaths, total_assists = player_champ
-        if summoner_name not in result:
-            result[summoner_name] = {
-                "champions": []
+    for player in players:
+        summoner_name = player['summoner_name']
+        profile_icon_id = player['profile_icon_id']
+        puuid = player['puuid']
+
+        # Inicializar la estructura de datos para cada jugador
+        result[summoner_name] = {
+            "profile_icon_id": profile_icon_id,
+            "puuid": puuid,
+            "total_games": 0,
+            "total_wins": 0,
+            "champs": []
+        }
+
+        # Obtener estadísticas de los campeones de match_history.db
+        player_champs = query_db("""
+            SELECT champion_id, games_played, total_kills, total_deaths, total_assists, total_gold, total_damage, total_wins
+            FROM champion_stats
+            WHERE puuid = ?
+        """, (puuid,), db='match_history')
+
+        for champ_stats in player_champs:
+            champion_id = champ_stats['champion_id']
+            champion_name = champions.get(champion_id, "Unknown Champion")
+            games_played = champ_stats['games_played']
+            total_kills = champ_stats['total_kills']
+            total_deaths = champ_stats['total_deaths']
+            total_assists = champ_stats['total_assists']
+            total_gold = champ_stats['total_gold']
+            total_damage = champ_stats['total_damage']
+            total_wins = champ_stats['total_wins']
+
+            result[summoner_name]["total_games"] += games_played
+            result[summoner_name]["total_wins"] += total_wins
+
+            champ_stats = {
+                "games_played": games_played,
+                "total_kills": total_kills,
+                "total_deaths": total_deaths,
+                "total_assists": total_assists,
+                "kda": round((total_kills + total_assists) / max(1, total_deaths), 2),
+                "win_ratio": round((total_wins / games_played) * 100, 2) if games_played > 0 else 0,
+                "total_gold": total_gold,
+                "total_damage": total_damage
             }
-        champion_name = champions.get(champion_id, "Unknown Champion")
-        kda = round((total_kills + total_assists) / max(1, total_deaths), 2)
-        result[summoner_name]["champions"].append({
-            "champion_name": champion_name,
-            "count": count,
-            "kda": kda
-        })
+
+            result[summoner_name]["champs"].append({
+                "champion_id": champion_id,
+                "champion_name": champion_name,
+                **champ_stats
+            })
+
+        # Ordenar los campeones por juegos jugados y tomar los 6 primeros
+        result[summoner_name]["champs"] = sorted(result[summoner_name]["champs"], key=lambda x: x['games_played'], reverse=True)[:6]
 
     return render_template('players_champs.html', players_champs=result)
+
+@app.route('/update-champion-stats/<puuid>', methods=['POST'])
+@login_required
+@admin_required
+def update_champion_stats(puuid):
+    stats = calculate_champion_stats(puuid)
+
+    if not stats:
+        flash("No se pudieron obtener las estadísticas del jugador.")
+        return redirect(url_for('get_players_champs'))
+
+    player = query_db("SELECT summoner_name, profile_icon_id FROM players WHERE puuid = ?", (puuid,), one=True, db='league_tasks')
+    if not player:
+        flash("Jugador no encontrado.")
+        return redirect(url_for('get_players_champs'))
+
+    summoner_name = player['summoner_name']
+    profile_icon_id = player['profile_icon_id']
+
+    result = {
+        summoner_name: {
+            "profile_icon_id": profile_icon_id,
+            "total_games": sum(champ['games_played'] for champ in stats.values()),
+            "total_wins": sum(champ['total_wins'] for champ in stats.values()),
+            "champs": []
+        }
+    }
+
+    for champion_id, champ_stats in stats.items():
+        champ_stats['champion_id'] = champion_id
+        champ_stats['champion_name'] = champions.get(champion_id, "Unknown Champion")
+        result[summoner_name]["champs"].append(champ_stats)
+
+    # Ordenar los campeones por juegos jugados y tomar los 6 primeros
+    result[summoner_name]["champs"] = sorted(result[summoner_name]["champs"], key=lambda x: x['games_played'], reverse=True)[:6]
+
+    flash(f"Estadísticas de {summoner_name} actualizadas con éxito.")
+    return redirect(url_for('get_players_champs'))
 
 @app.route('/match-history', methods=['GET', 'POST'])
 @login_required
@@ -931,7 +1389,7 @@ def match_history():
             "secondary_runes": secondary_rune_ids,  # Pasar los IDs de las runas secundarias
             "spells": spells,
             "item_list": ','.join(item_ids),  # Convertir la lista de IDs de ítems a una cadena
-            "elo": "Gold",  # Placeholder for elo, replace with actual data
+            "elo": "NVE",  # Placeholder for elo, replace with actual data
             "spell1_icon": f"{spell1}.png",  # Placeholder for spell1 icon path
             "spell2_icon": f"{spell2}.png",  # Placeholder for spell2 icon path,
             "result": "Win" if match['win'] else "Loss"  # Determinar el resultado de la partida
@@ -943,9 +1401,6 @@ def match_history():
 
 # Inicializar la base de datos y correr la app
 if __name__ == '__main__':
-    init_db()
+    init_league_tasks_db()
     init_match_history_db()
-    print("Estructura de la tabla de tareas:")
-    update_user_roles()
-    migrate_db()
     app.run(debug=True)
