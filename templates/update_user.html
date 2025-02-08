@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update User</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Update User</h1>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/admin">Admin Dashboard</a></li>
+                <li><a href="/logout">Logout</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div class="container">
+        <form method="POST" action="{{ url_for('update_user') }}">
+            <input type="hidden" name="user_id" value="{{ user_id }}" />
+            
+            <label>Usuario:</label>
+            <select name="user_id" id="user_id" onchange="updateUserFields(this)">
+                <option value="">-- Selecciona Usuario --</option>
+                {% for u in users %}
+                    <option value="{{ u.id }}" {% if u.id == user.id %}selected{% endif %}>
+                        {{ u.username }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <label>PUUID:</label>
+            <select name="puuid" id="puuid" onchange="autoFillSummoner(this)">
+                <option value="">-- Selecciona PUUID --</option>
+                {% for p in players %}
+                    <option 
+                        value="{{ p.puuid }}"
+                        {% if p.puuid == user.puuid %}selected{% endif %}
+                        data-summoner="{{ p.summoner_name }}"
+                    >
+                        {{ p.puuid }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <label>Summoner Name:</label>
+            <input type="text" name="summoner_name" id="summoner_name" value="{{ user.summoner_name }}" readonly/>
+
+            <button type="submit">Actualizar</button>
+        </form>
+
+        <script>
+        function autoFillSummoner(el) {
+            const summonerName = el.options[el.selectedIndex].getAttribute("data-summoner");
+            document.getElementById("summoner_name").value = summonerName || "";
+        }
+
+        function updateUserFields(el) {
+            const userId = el.value;
+            if (userId) {
+                window.location.href = "{{ url_for('update_user') }}?user_id=" + userId;
+            }
+        }
+        </script>
+    </div>
+</body>
+</html>

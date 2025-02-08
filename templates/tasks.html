@@ -196,12 +196,12 @@
                     <option value="damage">Damage</option>
                     <option value="kill_participation">Kill Participation</option>
                     <option value="kda">KDA</option>
-                    <option value="solo_kills">Solo Kills</option>
+                    <option value="vision_score_per_min">Vision Score per Min</option>
                     <option value="wins">Wins</option>
                     <option value="dragons">Dragons</option>
                     <option value="barons">Barons</option>
                     <option value="wards_placed">Wards Placed</option>
-                    <option value="atakhan_kills">Atakhan Kills</option>
+                    <option value="use_specific_champion">Use Specific Champion</option>
                 </select>
             </p>
             <p>
@@ -214,7 +214,7 @@
             </p>
             <p>
                 <label for="champion">Champion (optional)</label>
-                <input id="champion" name="champion" type="text">
+                <input id="champion" name="champion" type="number" min="1" step="1">
             </p>
             <p>
                 <input type="submit" value="Create Task">

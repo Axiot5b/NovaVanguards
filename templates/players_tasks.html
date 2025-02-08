@@ -1,10 +1,44 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Players Tasks</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .progress-bar-container {
+            width: 500%;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar {
+            height: 20px;
+            text-align: center;
+            color: white;
+            line-height: 20px;
+            border-radius: 5px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .progress-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            color: rgb(0, 0, 0);
+            font-weight: bold;
+            z-index: 2;
+        }
+        .orange { background-color: orange; }
+        .yellow { background-color: yellow; }
+        .green { background-color: green; }
+        .player-separator {
+            height: 10px;
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -29,34 +63,42 @@
 
     <main>
         <section class="content card">
-            {% for summoner_name, tasks in players_tasks.items() %}
-                <article class="player-tasks">
-                    <h2>{{ summoner_name }}</h2>
-                    <ul class="task-list">
-                        {% for task in tasks %}
-                            <li class="task-item">
-                                <div class="task-info">
-                                    <p><strong>{{ task.description }}</strong></p>
-                                    <p>Progress: {{ task.progress }} / {{ task.target_value }}</p>
-                                    <p>Completed: {{ task.is_completed }}</p>
-                                </div>
-                                <div class="progress-bar-container">
-                                    <div class="progress-bar" role="progressbar" aria-valuenow="{{ (task.progress / task.target_value) | multiply(100) | min_value(100) }}" aria-valuemin="0" aria-valuemax="100">
-                                        <div class="progress {% if task.progress / task.target_value < 0.45 %}orange{% elif task.progress / task.target_value < 0.75 %}yellow{% else %}green{% endif %}" style="width: {{ (task.progress / task.target_value) | multiply(100) | min_value(100) }}%">
-                                            {{ (task.progress / task.target_value) | multiply(100) | min_value(100) | int }}%
+            {% if players_tasks %}
+                <table class="players-tasks-table">
+                    <thead>
+                        <tr>
+                            <th>Player</th>
+                            <th>Task</th>
+                            <th>Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for summoner_name, tasks in players_tasks.items() %}
+                            <tr class="player-separator"><td colspan="3"></td></tr>
+                            <tr>
+                                <td>{{ summoner_name }}</td>
+                                <td colspan="2"></td>
+                            </tr>
+                            {% for task in tasks %}
+                            <tr>
+                                <td></td>
+                                <td>{{ task.description }}</td>
+                                <td>
+                                    <div class="progress-bar-container">
+                                        <div class="progress-bar {% if task.progress / task.target_value < 0.45 %}orange{% elif task.progress / task.target_value < 0.75 %}yellow{% else %}green{% endif %}" 
+                                             style="width: {{ (task.progress / task.target_value) | multiply(100) | min_value(100) }}%">
+                                            <span class="progress-text">{{ task.progress }}/{{ task.target_value }}</span>
                                         </div>
                                     </div>
-                                </div>
-                                <form method="POST" action="{{ url_for('unassign_task') }}" class="unassign-form">
-                                    <input type="hidden" name="task_id" value="{{ task.id }}">
-                                    <input type="hidden" name="player_id" value="{{ task.player_id }}">
-                                    <button type="submit" class="button-danger">Unassign</button>
-                                </form>
-                            </li>
+                                </td>
+                            </tr>
+                            {% endfor %}
                         {% endfor %}
-                    </ul>
-                </article>
-            {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No hay tareas asignadas.</p>
+            {% endif %}
         </section>
     </main>
 </body>

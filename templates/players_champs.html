@@ -24,87 +24,92 @@
             color: #000000;
         }
 
-        .content {
-            margin: 20px auto;
-            width: 90%;
-            max-width: 1200px;
-            background: #fff;
+        .player-card {
+            background-color: #fff;
             border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin: 20px;
             padding: 20px;
-        }
-
-        /* Navbar */
-        nav {
-            background: #222;
-            padding: 10px 0;
-        }
-
-        nav ul {
-            list-style: none;
             text-align: center;
-            margin: 0;
-            padding: 0;
+            width: 80%;
+            display: inline-block;
+            vertical-align: top;
         }
 
-        nav ul li {
-            display: inline;
-            margin: 0 15px;
+        .profile-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
         }
 
-        nav ul li a {
-            color: #fff;
-            text-decoration: none;
-            font-weight: bold;
+        .profile-info img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 10px;
         }
 
-        nav ul li a:hover {
-            text-decoration: underline;
-        }
-
-        /* Table Styles */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
+        .profile-info .stats {
             text-align: left;
         }
 
-        table thead {
-            background-color: #f4f4f4;
-        }
-
-        table th, table td {
-            padding: 15px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        table th {
-            background-color: #333;
-            color: white;
-        }
-
-        table tr:hover {
+        .champion-card {
             background-color: #f9f9f9;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin: 10px;
+            padding: 10px;
+            text-align: center;
+            width: 150px;
+            display: inline-block;
+            vertical-align: top;
         }
 
-        .champion-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            margin-right: 10px;
-            vertical-align: middle;
+        .champion-card img {
+            width: 50px;
+            height: 50px;
         }
 
-        /* KDA Styling */
-        .kda-positive {
-            color: green;
+        .champion-card .champion-info {
+            margin-top: 10px;
+        }
+
+        .champion-card .champion-info p {
+            margin: 5px 0;
+        }
+
+        .champion-card .champion-info .kda {
             font-weight: bold;
         }
 
-        .kda-negative {
-            color: red;
-            font-weight: bold;
+        .champion-row {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .update-button {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .update-button form {
+            display: inline-block;
+        }
+
+        .update-button button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .update-button button:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
@@ -129,36 +134,41 @@
         </nav>
     </header>
 
-    <div class="content">
-        {% for summoner_name, data in players_champs.items() %}
-            <h2>{{ summoner_name }}</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Champion</th>
-                        <th>Pick</th>
-                        <th>KDA</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for champ in data.champions %}
-                        <tr>
-                            <td>
-                                <img src="{{ url_for('static', filename='img/champions/' ~ champ.champion_name ~ '.png') }}" 
-                                     alt="{{ champ.champion_name }}" class="champion-icon">
-                                {{ champ.champion_name }}
-                            </td>
-                            <td>{{ champ.count }}</td>
-                            <td>
-                                <span class="{% if champ.kda >= 3.0 %}kda-positive{% else %}kda-negative{% endif %}">
-                                    {{ champ.kda }}
-                                </span>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% endfor %}
-    </div>
+    <main>
+        <section class="content card">
+            {% for summoner_name, data in players_champs.items() %}
+                <div class="player-card">
+                    <div class="profile-info">
+                        <img src="{{ url_for('static', filename='img/profile_icons/' + data.profile_icon_id|string + '.png') }}" alt="Profile Icon">
+                        <div class="stats">
+                            <h2>{{ summoner_name }}</h2>
+                            <p>Total Partidas: {{ data.total_games }}</p>
+                            <p>Win Ratio: {{ (data.total_wins / data.total_games) * 100 if data.total_games > 0 else 0 }}%</p>
+                        </div>
+                    </div>
+                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                        <div class="update-button">
+                            <form method="POST" action="{{ url_for('update_champion_stats', puuid=data.puuid) }}">
+                                <button type="submit">Actualizar Estadísticas</button>
+                            </form>
+                        </div>
+                    {% endif %}
+                    <div class="champion-row">
+                        {% for champ in data.champs %}
+                            <div class="champion-card">
+                                <img src="{{ url_for('static', filename='img/champions/' + champ.champion_name + '.png') }}" alt="{{ champ.champion_name }}">
+                                <div class="champion-info">
+                                    <p>Partidas: {{ champ.games_played }}</p>
+                                    <p>Asesinatos: {{ champ.total_kills }}</p>
+                                    <p>Win Ratio: {{ champ.win_ratio }}%</p>
+                                    <p class="kda">KDA: {{ champ.kda }}</p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </section>
+    </main>
 </body>
 </html>
