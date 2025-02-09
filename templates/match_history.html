@@ -44,6 +44,8 @@
 
             {% if matches %}
                 <h3>Match History for {{ summoner_name }}</h3>
+                <p><strong>ELO:</strong> {{ matches[0].elo if matches else "Sin ranking" }}</p> 
+                
                 <div class="match-history">
                     {% for match in matches %}
                         <div class="match-card" onclick="this.classList.toggle('flipped')">

@@ -19,13 +19,7 @@
             color: #ffffff;
         }
 
-        h2 {
-            text-align: center;
-            color: #000000;
-        }
-
         .player-card {
-            background-color: #fff;
             border-radius: 10px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin: 20px;
@@ -34,34 +28,46 @@
             width: 80%;
             display: inline-block;
             vertical-align: top;
+            background-size: cover;
+            background-position: center;
+            color: white;
+            text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.7);
         }
 
         .profile-info {
             display: flex;
-            align-items: center;
+            align-items: center; /* Alinea verticalmente el icono con el cuadro */
             justify-content: center;
+            gap: 10px; /* Espacio entre el icono y el cuadro difuminado */
             margin-bottom: 20px;
         }
 
         .profile-info img {
-            width: 50px;
-            height: 50px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
-            margin-right: 10px;
         }
 
-        .profile-info .stats {
+        .player-info-blur {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 10px;
             text-align: left;
+            width: auto;
+            max-width: 80%;
+            color: white;
+            text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.7);
         }
 
         .champion-card {
-            background-color: #f9f9f9;
+            background-color: rgba(255, 255, 255, 0.8);
             border-radius: 10px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin: 10px;
             padding: 10px;
             text-align: center;
-            width: 150px;
+            width: 190px;
             display: inline-block;
             vertical-align: top;
         }
@@ -73,14 +79,7 @@
 
         .champion-card .champion-info {
             margin-top: 10px;
-        }
-
-        .champion-card .champion-info p {
-            margin: 5px 0;
-        }
-
-        .champion-card .champion-info .kda {
-            font-weight: bold;
+            color: black;
         }
 
         .champion-row {
@@ -93,10 +92,6 @@
             display: flex;
             justify-content: center;
             margin-bottom: 20px;
-        }
-
-        .update-button form {
-            display: inline-block;
         }
 
         .update-button button {
@@ -137,13 +132,13 @@
     <main>
         <section class="content card">
             {% for summoner_name, data in players_champs.items() %}
-                <div class="player-card">
+                <div class="player-card" style="background-image: url('{{ url_for('static', filename='img/backgrounds/' + summoner_name|string + '.jpg') }}');">
                     <div class="profile-info">
                         <img src="{{ url_for('static', filename='img/profile_icons/' + data.profile_icon_id|string + '.png') }}" alt="Profile Icon">
-                        <div class="stats">
+                        <div class="player-info-blur">
                             <h2>{{ summoner_name }}</h2>
                             <p>Total Partidas: {{ data.total_games }}</p>
-                            <p>Win Ratio: {{ (data.total_wins / data.total_games) * 100 if data.total_games > 0 else 0 }}%</p>
+                            <p>Win Ratio: {{ ((data.total_wins / data.total_games) * 100 if data.total_games > 0 else 0) | round(2) }}%</p>
                         </div>
                     </div>
                     {% if current_user.is_authenticated and current_user.role == 'admin' %}
@@ -154,7 +149,20 @@
                         </div>
                     {% endif %}
                     <div class="champion-row">
-                        {% for champ in data.champs %}
+                        {% for champ in data.champs[:3] %}
+                            <div class="champion-card">
+                                <img src="{{ url_for('static', filename='img/champions/' + champ.champion_name + '.png') }}" alt="{{ champ.champion_name }}">
+                                <div class="champion-info">
+                                    <p>Partidas: {{ champ.games_played }}</p>
+                                    <p>Asesinatos: {{ champ.total_kills }}</p>
+                                    <p>Win Ratio: {{ champ.win_ratio }}%</p>
+                                    <p class="kda">KDA: {{ champ.kda }}</p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="champion-row">
+                        {% for champ in data.champs[3:6] %}
                             <div class="champion-card">
                                 <img src="{{ url_for('static', filename='img/champions/' + champ.champion_name + '.png') }}" alt="{{ champ.champion_name }}">
                                 <div class="champion-info">

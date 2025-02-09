@@ -1344,6 +1344,10 @@ def match_history():
 
     puuid = player['puuid']
 
+    # Obtener el elo del jugador
+    summoner_id = get_summoner_id(summoner_name)
+    elo = get_soloq_elo(summoner_id) if summoner_id else "Sin ranking"
+
     # Llamar a store_match_history para actualizar el historial de partidas
     store_match_history(puuid)
 
@@ -1352,52 +1356,88 @@ def match_history():
     match_data = []
     for match in matches:
         spells = match['spells']
-        if isinstance(spells, str):
-            spell1, spell2 = spells.split(',')
-        else:
-            spell1, spell2 = "unknown", "unknown"
+        spell1, spell2 = spells.split(',') if isinstance(spells, str) else ("unknown", "unknown")
 
         items = match['items']
-        if not isinstance(items, str):
-            items = str(items)
+        items = str(items) if not isinstance(items, str) else items
 
         champion_name = champions.get(match['champion_id'], "Unknown Champion")
 
-        # Obtener los IDs de los ítems del diccionario y manejar correctamente los ítems que ya están en formato de cadena
-        item_ids = []
-        for item in items.split(','):
-            try:
-                item_id = int(item)
-            except ValueError:
-                item_id = item
-            item_ids.append(str(item_id))
+        item_ids = [str(int(item)) if item.isdigit() else item for item in items.split(',')]
 
-        # Obtener los IDs de las runas
         primary_rune_ids = match['primary_runes'].split(',')
         secondary_rune_ids = match['secondary_runes'].split(',')
 
         match_data.append({
             "match_date": match['match_date'],
-            "champion_id": str(match['champion_id']),  # Convertir a cadena
-            "champion_name": champion_name,  # Obtener el nombre del campeón del diccionario
+            "champion_id": str(match['champion_id']),
+            "champion_name": champion_name,
             "kills": match['kills'],
             "deaths": match['deaths'],
             "assists": match['assists'],
             "total_gold": match['total_gold'],
             "lane": match['lane'],
-            "primary_runes": primary_rune_ids,  # Pasar los IDs de las runas primarias
-            "secondary_runes": secondary_rune_ids,  # Pasar los IDs de las runas secundarias
+            "primary_runes": primary_rune_ids,
+            "secondary_runes": secondary_rune_ids,
             "spells": spells,
-            "item_list": ','.join(item_ids),  # Convertir la lista de IDs de ítems a una cadena
-            "elo": "NVE",  # Placeholder for elo, replace with actual data
-            "spell1_icon": f"{spell1}.png",  # Placeholder for spell1 icon path
-            "spell2_icon": f"{spell2}.png",  # Placeholder for spell2 icon path,
-            "result": "Win" if match['win'] else "Loss"  # Determinar el resultado de la partida
+            "item_list": ','.join(item_ids),
+            "elo": elo,  # Se agrega el ELO real del jugador
+            "spell1_icon": f"{spell1}.png",
+            "spell2_icon": f"{spell2}.png",
+            "result": "Win" if match['win'] else "Loss"
         })
 
-    print(f"Match data for {summoner_name}: {match_data}")  # Agregar esta línea para depuración
+    print(f"Match data for {summoner_name}: {match_data}")  # Debugging
 
-    return render_template('match_history.html', summoner_name=summoner_name, players=players, matches=match_data)
+    return render_template('match_history.html', players=players, matches=match_data)
+
+
+def get_summoner_id(summoner_name):
+    """ Obtiene el ID del invocador desde la base de datos league_tasks.db y luego desde la Riot API. """
+    # Obtener el PUUID del jugador desde la base de datos
+    player = query_db("SELECT puuid FROM players WHERE summoner_name = ?", (summoner_name,), one=True, db='league_tasks')
+    if not player:
+        print(f"Jugador con nombre {summoner_name} no encontrado en la base de datos.")
+        return None
+
+    puuid = player['puuid']
+
+    # Hacer una solicitud a la API de Riot para obtener el ID del invocador usando el PUUID
+    url = f"{SUMMONER_API_BASE_URL}/lol/summoner/v4/summoners/by-puuid/{puuid}?api_key={API_KEY}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json().get("id")
+    else:
+        print(f"Error en la API: {response.status_code}, {response.text}")
+        return None
+
+
+def get_soloq_elo(summoner_id):
+    """ Obtiene el ELO del jugador en SoloQ, o Flex si no tiene SoloQ. """
+    if not summoner_id:
+        print("Error: summoner_id es None.")
+        return "Sin ranking"
+
+    url = f"{SUMMONER_API_BASE_URL}/lol/league/v4/entries/by-summoner/{summoner_id}?api_key={API_KEY}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print(f"Error en la API: {response.status_code}, {response.text}")
+        return "Error obteniendo ranking"
+
+    rank_data = response.json()
+
+    # Verificar si tiene SoloQ
+    for queue in rank_data:
+        if queue["queueType"] == "RANKED_SOLO_5x5":
+            return f"{queue['tier']} {queue['rank']} ({queue['leaguePoints']} LP)"
+
+    # Si no tiene SoloQ, verificar Flex
+    for queue in rank_data:
+        if queue["queueType"] == "RANKED_FLEX_SR":
+            return f"Flex {queue['tier']} {queue['rank']} ({queue['leaguePoints']} LP)"
+
+    return "Sin ranking"
 
 # Inicializar la base de datos y correr la app
 if __name__ == '__main__':
