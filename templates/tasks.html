@@ -6,7 +6,6 @@
     <title>Tasks</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <style>
-        /* General */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
@@ -54,27 +53,17 @@
         nav ul li a:hover {
             color: #ffcc00;
         }
-
-        /* Main Content */
-        .content {
-            max-width: 900px;
-            margin: 20px auto;
-            background: #fff;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-        }
-
-        .content h2 {
-            font-size: 1.8em;
-            color: #333;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ddd;
-            padding-bottom: 10px;
-        }
-
-        /* Formulario */
-        form {
+        /* Tabla y contenido */
+    .content {
+        max-width: 1200px; /* Aumentamos el ancho máximo del contenedor */
+        width: 95%;
+        margin: 20px auto;
+        padding: 20px;
+        overflow-x: auto; /* Permite scroll horizontal en pantallas pequeñas */
+    }
+    
+    /* Formulario */
+    form {
             margin-bottom: 20px;
         }
 
@@ -117,44 +106,128 @@
             background: #0056b3;
         }
 
-        /* Tabla */
-        table {
+    /* Estilos de tabla mejorados */
+    table {
+        width: 100%;
+        min-width: 900px; /* Ancho mínimo para asegurar legibilidad */
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    table th, table td {
+        padding: 12px 15px;
+        text-align: left;
+        border: 1px solid #ddd;
+        white-space: normal; /* Permite que el texto se ajuste en múltiples líneas */
+        word-wrap: break-word; /* Rompe palabras largas */
+    }
+
+    /* Anchos específicos para cada columna */
+    table th:nth-child(1), /* ID */
+    table td:nth-child(1) {
+        width: 5%;
+        min-width: 50px;
+    }
+
+    table th:nth-child(2), /* Description */
+    table td:nth-child(2) {
+        width: 20%;
+        min-width: 200px;
+    }
+
+    table th:nth-child(3), /* Type */
+    table td:nth-child(3) {
+        width: 10%;
+        min-width: 100px;
+    }
+
+    table th:nth-child(4), /* Target */
+    table td:nth-child(4) {
+        width: 8%;
+        min-width: 80px;
+    }
+
+    table th:nth-child(5), /* Points */
+    table td:nth-child(5) {
+        width: 7%;
+        min-width: 70px;
+    }
+
+    table th:nth-child(6), /* Champion */
+    table td:nth-child(6) {
+        width: 10%;
+        min-width: 100px;
+    }
+
+    table th:nth-child(7), /* Progress */
+    table td:nth-child(7) {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    table th:nth-child(8), /* Completion Rate */
+    table td:nth-child(8) {
+        width: 10%;
+        min-width: 100px;
+    }
+
+    table th:nth-child(9), /* Action */
+    table td:nth-child(9) {
+        width: 10%;
+        min-width: 80px;
+    }
+
+    /* Mejora de la responsividad */
+    @media screen and (max-width: 1200px) {
+        .content {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        table th, table td {
-            border: 1px solid #ddd;
             padding: 10px;
-            text-align: left;
+            margin: 10px auto;
         }
 
-        table th {
-            background-color: #333;
-            color: white;
+        table {
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
-        table tr:nth-child(even) {
-            background-color: #f9f9f9;
+        /* Estilos para el scroll horizontal */
+        .content::-webkit-scrollbar {
+            height: 8px;
         }
 
-        table tr:hover {
-            background-color: #f1f1f1;
+        .content::-webkit-scrollbar-track {
+            background: #f1f1f1;
         }
 
-        button {
-            background: #dc3545;
-            color: white;
-            padding: 5px 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+        .content::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
         }
 
-        button:hover {
-            background: #a71d2a;
+        .content::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
+    }
+
+    /* Mejoras visuales para el contenido de las celdas */
+    td {
+        vertical-align: middle;
+        line-height: 1.4;
+    }
+
+    /* Estilo mejorado para la barra de progreso */
+    .progress-bar {
+        margin: 5px 0;
+        min-width: 150px;
+    }
+
+    /* Estilo para el botón de eliminar */
+    .delete-btn {
+        padding: 6px 12px;
+        white-space: nowrap;
+    }
+</style>
     </style>
 </head>
 <body>
@@ -221,7 +294,6 @@
             </p>
         </form>
     </div>
-
     <div class="content">
         <h2>Existing Tasks</h2>
         <table>
@@ -233,23 +305,32 @@
                     <th>Target</th>
                     <th>Points</th>
                     <th>Champion</th>
+                    <th>Progress</th>
+                    <th>Completion Rate</th>
                     <th>Action</th>
                 </tr>
             </thead>
             <tbody>
                 {% for task in tasks %}
                 <tr>
-                    <td>{{ task[0] }}</td>
-                    <td>{{ task[1] }}</td>
-                    <td>{{ task[2] }}</td>
-                    <td>{{ task[3] }}</td>
-                    <td>{{ task[4] }}</td>
-                    <td>{{ task[5] if task[5] else 'None' }}</td>
+                    <td>{{ task.id }}</td>
+                    <td>{{ task.description }}</td>
+                    <td>{{ task.objective_type }}</td>
+                    <td>{{ task.target_value }}</td>
+                    <td>{{ task.points }}</td>
+                    <td>{{ task.champion }}</td>
+                    <td>
+                        <div class="progress-bar">
+                            <div class="progress" style="width: {{ task.completion_rate }}%"></div>
+                            <span>{{ task.times_completed }}/{{ task.times_assigned }}</span>
+                        </div>
+                    </td>
+                    <td>{{ task.completion_rate }}%</td>
                     <td>
                         <form method="POST" action="{{ url_for('manage_tasks') }}" style="display:inline;">
                             <input type="hidden" name="task_id" value="{{ task.id }}">
                             <input type="hidden" name="delete_task" value="1">
-                            <button type="submit">Delete</button>
+                            <button type="submit" class="delete-btn">Delete</button>
                         </form>
                     </td>
                 </tr>

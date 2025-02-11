@@ -34,7 +34,7 @@ sqlite3.register_adapter(datetime, adapt_datetime)
 sqlite3.register_converter("timestamp", convert_timestamp)
 
 # Configuración básica
-API_KEY = "RGAPI-68903f6f-e823-4f62-993e-a68466928ba4"
+API_KEY = "RGAPI-cf08c60c-cf4f-4464-9d1e-2de61bc58167"
 SUMMONER_API_BASE_URL = "https://la1.api.riotgames.com"  # Base URL para datos del jugador (LAN)
 MATCH_API_BASE_URL = "https://americas.api.riotgames.com"  # Base URL para datos de partidas
 DB_NAME = "league_tasks.db"
@@ -106,11 +106,6 @@ def admin_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated_function
-
-def get_db():
-    conn = sqlite3.connect(DB_NAME, timeout=10, detect_types=sqlite3.PARSE_DECLTYPES)
-    conn.row_factory = sqlite3.Row  # Esto permite acceder a las columnas por nombre
-    return conn
 
 # Bloqueo para asegurar acceso concurrente seguro a la base de datos
 db_lock = Lock()
@@ -227,6 +222,16 @@ def init_match_history_db():
                 deaths INTEGER,
                 assists INTEGER,
                 total_gold INTEGER,
+                cs INTEGER DEFAULT 0, 
+                vision_score INTEGER DEFAULT 0, 
+                damage_dealt INTEGER DEFAULT 0,
+                damage_taken INTEGER DEFAULT 0,
+                wards_placed INTEGER DEFAULT 0,
+                wards_destroyed INTEGER DEFAULT 0,
+                double_kills INTEGER DEFAULT 0,
+                triple_kills INTEGER DEFAULT 0,
+                quadra_kills INTEGER DEFAULT 0,
+                penta_kills INTEGER DEFAULT 0,
                 lane TEXT,
                 primary_runes TEXT,
                 secondary_runes TEXT,
@@ -253,12 +258,29 @@ def init_match_history_db():
             )
         ''')
 
-        # Crear tabla processed_matches si no existe
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS processed_matches (
-                match_id TEXT PRIMARY KEY
-            )
-        ''')
+        # Obtener las columnas actuales de la tabla
+        cursor.execute("PRAGMA table_info(match_history)")
+        columns = [column[1] for column in cursor.fetchall()]
+
+        # Lista de columnas necesarias
+        required_columns = {
+            "cs": "INTEGER DEFAULT 0",
+            "vision_score": "INTEGER DEFAULT 0",
+            "damage_dealt": "INTEGER DEFAULT 0",
+            "damage_taken": "INTEGER DEFAULT 0",
+            "wards_placed": "INTEGER DEFAULT 0",
+            "wards_destroyed": "INTEGER DEFAULT 0",
+            "double_kills": "INTEGER DEFAULT 0",
+            "triple_kills": "INTEGER DEFAULT 0",
+            "quadra_kills": "INTEGER DEFAULT 0",
+            "penta_kills": "INTEGER DEFAULT 0"
+        }
+
+        # Agregar las columnas faltantes
+        for column, column_type in required_columns.items():
+            if column not in columns:
+                cursor.execute(f"ALTER TABLE match_history ADD COLUMN {column} {column_type}")
+                print(f"Columna '{column}' agregada a match_history.")
 
         conn.commit()
         conn.close()
@@ -299,6 +321,22 @@ def create_player_stats_table():
     conn.commit()
     conn.close()
 
+def query_db(query, args=(), one=False, db='league_tasks'):
+    with db_lock:
+        if db == 'league_tasks':
+            conn = get_db()
+        elif db == 'match_history':
+            conn = get_match_history_db()
+        else:
+            raise ValueError("Invalid database specified")
+
+        cursor = conn.execute(query, args)
+        rv = cursor.fetchall()
+        cursor.close()
+        conn.commit()
+        conn.close()
+        return (rv[0] if rv else None) if one else rv
+
 def add_game_time_column():
     create_player_stats_table()
     conn = sqlite3.connect('league_tasks.db')
@@ -330,6 +368,21 @@ def add_total_team_kills_column():
     conn.close()
 
 add_total_team_kills_column()
+
+def add_game_time_column():
+    try:
+        query_db("""
+            ALTER TABLE match_history 
+            ADD COLUMN game_time INTEGER DEFAULT 0
+        """, db='match_history')
+        print("Column game_time added successfully")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" not in str(e):
+            raise e
+        print("Column game_time already exists")
+
+# Ahora sí podemos llamar a la función
+add_game_time_column()
 
 def migrate_db():
     with db_lock:
@@ -369,22 +422,6 @@ def update_user_roles():
 
         conn.commit()
         conn.close()
-
-def query_db(query, args=(), one=False, db='league_tasks'):
-    with db_lock:
-        if db == 'league_tasks':
-            conn = get_db()
-        elif db == 'match_history':
-            conn = get_match_history_db()
-        else:
-            raise ValueError("Invalid database specified")
-
-        cursor = conn.execute(query, args)
-        rv = cursor.fetchall()
-        cursor.close()
-        conn.commit()
-        conn.close()
-        return (rv[0] if rv else None) if one else rv
     
 def check_and_add_column():
     with db_lock:
@@ -524,9 +561,7 @@ def manage_tasks():
                 flash("Faltan datos para eliminar la tarea.")
                 return redirect(url_for('manage_tasks'))
 
-            # Eliminar las asignaciones de la tarea a los jugadores
             query_db("DELETE FROM assigned_tasks WHERE task_id = ?", (task_id,))
-            # Eliminar la tarea
             query_db("DELETE FROM tasks WHERE id = ?", (task_id,))
             flash("Tarea eliminada con éxito.")
         else:
@@ -536,27 +571,88 @@ def manage_tasks():
             points = request.form.get('points')
             champion = request.form.get('champion')
 
-            # Verificar si el ID del campeón es válido
-            if champion and not champion.isdigit():
-                flash("El ID del campeón debe ser un número.")
+            if not all([description, objective_type, target_value, points]):
+                flash("Todos los campos son obligatorios excepto el campeón.")
+                return redirect(url_for('manage_tasks'))
+
+            try:
+                target_value = float(target_value)
+                points = int(points)
+                if champion:
+                    champion = int(champion)
+            except ValueError:
+                flash("Los valores numéricos son inválidos.")
                 return redirect(url_for('manage_tasks'))
 
             query_db("""
                 INSERT INTO tasks (description, objective_type, target_value, points, champion)
                 VALUES (?, ?, ?, ?, ?)
-            """, (description, objective_type, target_value, points, int(champion) if champion else None))
+            """, (description, objective_type, target_value, points, champion))
 
             flash("Tarea creada con éxito")
         
         return redirect(url_for('manage_tasks'))
 
-    elif request.method == 'GET':
-        tasks = query_db("SELECT id, description, objective_type, target_value, points, champion FROM tasks")
-        return render_template('tasks.html', tasks=tasks)
+    # Para GET request
+    tasks = query_db("""
+        SELECT 
+            t.id,
+            t.description,
+            t.objective_type,
+            t.target_value,
+            t.points,
+            t.champion,
+            COUNT(at.id) as times_assigned,
+            SUM(CASE WHEN at.is_completed = 1 THEN 1 ELSE 0 END) as times_completed
+        FROM tasks t
+        LEFT JOIN assigned_tasks at ON t.id = at.task_id
+        GROUP BY t.id
+        ORDER BY t.id DESC
+    """)
 
-    elif request.method == 'GET':
-        tasks = query_db("SELECT id, description, objective_type, target_value, points, champion FROM tasks")
-        return render_template('tasks.html', tasks=tasks)
+    task_stats = []
+    for task in tasks:
+        champion_name = champions.get(task['champion'], "Cualquier campeón") if task['champion'] else "Cualquier campeón"
+        completion_rate = (task['times_completed'] / task['times_assigned'] * 100) if task['times_assigned'] > 0 else 0
+        
+        task_info = {
+            'id': task['id'],
+            'description': task['description'],
+            'objective_type': task['objective_type'],
+            'target_value': task['target_value'],
+            'points': task['points'],
+            'champion': champion_name,
+            'times_assigned': task['times_assigned'],
+            'times_completed': task['times_completed'],
+            'completion_rate': round(completion_rate, 2)
+        }
+        task_stats.append(task_info)
+
+    objective_types = [
+        ('kills', 'Asesinatos'),
+        ('deaths', 'Muertes'),
+        ('assists', 'Asistencias'),
+        ('turret_kills', 'Torres destruidas'),
+        ('cs', 'CS'),
+        ('damage', 'Daño'),
+        ('wins', 'Victorias'),
+        ('games', 'Partidas'),
+        ('wards_placed', 'Wards colocados'),
+        ('gold', 'Oro'),
+        ('atakhan_kills', 'Asesinatos de Atakhan'),
+        ('inhibitor_kills', 'Inhibidores destruidos'),
+        ('solo_kills', 'Asesinatos en solitario'),
+        ('dragons', 'Dragones'),
+        ('barons', 'Barones'),
+        ('kda', 'KDA'),
+        ('average_cs_per_min', 'CS por minuto'),
+        ('kill_participation', 'Participación en asesinatos'),
+        ('vision_score', 'Puntuación de visión'),
+        ('vision_score_per_min', 'Puntuación de visión por minuto'),
+        ('wards_destroyed', 'Wards destruidos')
+    ]
+
+    return render_template('tasks.html', tasks=task_stats, objective_types=objective_types, champions=champions)
 
 
 # Ruta para registrar jugadores
@@ -933,6 +1029,10 @@ def store_match_history(puuid):
             print(f"No se encontraron estadísticas para el jugador con PUUID {puuid} en la partida {match_id}")
             continue
 
+        # Determinar si el jugador ganó o perdió la partida
+        team_id = player_stats['teamId']
+        win = any(team['win'] for team in match_data['info']['teams'] if team['teamId'] == team_id)
+        result = 'Victory' if win else 'Defeat'  # Agregar esta línea
         match_date = datetime.fromtimestamp(match_data['info']['gameCreation'] / 1000, timezone.utc)
         champion_id = player_stats['championId']
         kills = player_stats['kills']
@@ -940,10 +1040,24 @@ def store_match_history(puuid):
         assists = player_stats['assists']
         total_gold = player_stats['goldEarned']
         lane = player_stats['teamPosition']
+        match_date = datetime.fromtimestamp(match_data['info']['gameCreation'] / 1000, timezone.utc)
+        game_time = match_data['info']['gameDuration']  # Agregar esta línea para obtener la duración
+        champion_id = player_stats['championId']
         primary_runes = ','.join([RUNES.get(r['perk'], str(r['perk'])) for r in player_stats['perks']['styles'][0]['selections']])
         secondary_runes = ','.join([RUNES.get(r['perk'], str(r['perk'])) for r in player_stats['perks']['styles'][1]['selections']])
         spells = ','.join([SPELLS.get(player_stats['summoner1Id'], str(player_stats['summoner1Id'])), SPELLS.get(player_stats['summoner2Id'], str(player_stats['summoner2Id']))])
         items = ','.join([str(player_stats[f'item{i}']) for i in range(7) if player_stats[f'item{i}'] != 0])
+
+        cs = player_stats.get('totalMinionsKilled', 0) + player_stats.get('neutralMinionsKilled', 0)
+        vision_score = player_stats.get('visionScore', 0)
+        damage_dealt = player_stats.get('totalDamageDealtToChampions', 0)
+        damage_taken = player_stats.get('totalDamageTaken', 0)
+        wards_placed = player_stats.get('wardsPlaced', 0)
+        wards_destroyed = player_stats.get('wardsKilled', 0)
+        double_kills = player_stats.get('doubleKills', 0)
+        triple_kills = player_stats.get('tripleKills', 0)
+        quadra_kills = player_stats.get('quadraKills', 0)
+        penta_kills = player_stats.get('pentaKills', 0)
 
         # Determinar si el jugador ganó o perdió la partida
         team_id = player_stats['teamId']
@@ -952,6 +1066,8 @@ def store_match_history(puuid):
         # Imprimir estadísticas de la partida en la terminal
         print(f"Match ID: {match_id}")
         print(f"Match Date: {match_date}")
+        print(f"Game Duration: {game_time} seconds")
+        print(f"Champion ID: {champion_id}")
         print(f"Champion ID: {champion_id}")
         print(f"Kills: {kills}, Deaths: {deaths}, Assists: {assists}")
         print(f"Total Gold: {total_gold}")
@@ -966,32 +1082,19 @@ def store_match_history(puuid):
         # Insertar el registro en la base de datos
         try:
             query_db('''
-                INSERT INTO match_history (match_id, puuid, match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items, win)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (match_id, puuid, match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items, win), db='match_history')
+            INSERT INTO match_history (
+                match_id, puuid, match_date, champion_id, kills, deaths, assists, total_gold, cs, vision_score, damage_dealt, damage_taken, wards_placed, wards_destroyed, double_kills, triple_kills, quadra_kills, penta_kills, lane, primary_runes, secondary_runes, spells, items, win, game_time
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+                match_id, puuid, match_date, champion_id, kills, deaths, assists, total_gold, cs, vision_score, damage_dealt, damage_taken, wards_placed, wards_destroyed, double_kills, triple_kills, quadra_kills, penta_kills, lane, primary_runes, secondary_runes, spells, items, result, game_time), db='match_history')
             print(f"Match {match_id} inserted into the database.")
         except sqlite3.IntegrityError as e:
             print(f"Error inserting match {match_id} into the database: {e}")
         except sqlite3.OperationalError as e:
             print(f"Database is locked: {e}")
-            time.sleep(1)  # Esperar un segundo antes de reintentar
+            time.sleep(1)
             continue
-
-    # Eliminar las partidas más antiguas si hay más de 20
-    try:
-        query_db('''
-            DELETE FROM match_history
-            WHERE match_id NOT IN (
-                SELECT match_id
-                FROM match_history
-                WHERE puuid = ?
-                ORDER BY match_date DESC
-                LIMIT 20
-            )
-        ''', (puuid,), db='match_history')
-        print(f"Old matches deleted for PUUID {puuid}.")
-    except Exception as e:
-        print(f"Error deleting old matches for PUUID {puuid}: {e}")
 
 def calculate_champion_stats(puuid):
     headers = {"X-Riot-Token": API_KEY}
@@ -1324,6 +1427,45 @@ def update_champion_stats(puuid):
     flash(f"Estadísticas de {summoner_name} actualizadas con éxito.")
     return redirect(url_for('get_players_champs'))
 
+def get_champion_pool_stats(puuid):
+    """Obtiene estadísticas del champion pool del jugador."""
+    query = """
+        SELECT champion_id, COUNT(*) as games_played,
+               SUM(kills) as total_kills,
+               SUM(deaths) as total_deaths,
+               SUM(assists) as total_assists,
+               SUM(total_gold) as total_gold,
+               SUM(win) as total_wins,
+               SUM(cs) as total_cs,
+               SUM(vision_score) as total_vision_score
+        FROM match_history
+        WHERE puuid = ?
+        GROUP BY champion_id
+        ORDER BY games_played DESC
+        LIMIT 6
+    """
+    champion_stats = query_db(query, (puuid,), db='match_history')
+
+    champion_pool = []
+    for champ in champion_stats:
+        champ_id = champ['champion_id']
+        champ_name = champions.get(champ_id, "Unknown Champion")
+        deaths = champ['total_deaths'] or 1  # Evitar división por cero
+
+        champion_pool.append({
+            "champion_id": champ_id,
+            "champion_name": champ_name,
+            "games_played": champ['games_played'],
+            "win_rate": round((champ['total_wins'] / champ['games_played']) * 100, 2),
+            "kda": round((champ['total_kills'] + champ['total_assists']) / deaths, 2),
+            "cs_per_game": round(champ['total_cs'] / champ['games_played'], 1),
+            "gold_per_game": round(champ['total_gold'] / champ['games_played'], 0),
+            "vision_score_per_game": round(champ['total_vision_score'] / champ['games_played'], 1),
+        })
+
+    return champion_pool
+
+
 @app.route('/match-history', methods=['GET', 'POST'])
 @login_required
 def match_history():
@@ -1335,7 +1477,7 @@ def match_history():
     players = query_db("SELECT summoner_name FROM players", db='league_tasks')
 
     if not summoner_name:
-        return render_template('match_history.html', players=players, matches=[])
+        return render_template('match_history.html', players=players, matches=[], champion_pool=[], summoner_name=None)
 
     player = query_db("SELECT puuid FROM players WHERE summoner_name = ?", (summoner_name,), one=True, db='league_tasks')
     if not player:
@@ -1344,60 +1486,189 @@ def match_history():
 
     puuid = player['puuid']
 
+    # Obtener el elo del jugador
+    summoner_id = get_summoner_id(summoner_name)
+    rank_info = get_soloq_elo(summoner_id)
+    
+    # Formatear el elo para mostrar
+    if rank_info['tier'] != "UNRANKED":
+        elo_display = f"{rank_info['tier']} {rank_info['rank']} ({rank_info['lp']} LP)"
+        queue_type = "Solo/Duo" if rank_info.get('queue_type') == "RANKED_SOLO_5x5" else "Flex"
+    else:
+        elo_display = "Unranked"
+        queue_type = ""
+
     # Llamar a store_match_history para actualizar el historial de partidas
     store_match_history(puuid)
 
-    matches = query_db("SELECT match_date, champion_id, kills, deaths, assists, total_gold, lane, primary_runes, secondary_runes, spells, items, win FROM match_history WHERE puuid = ? ORDER BY match_date DESC LIMIT 20", (puuid,), db='match_history')
+    # Actualizar la consulta SQL para incluir game_time
+    matches = query_db("""
+        SELECT match_date, champion_id, kills, deaths, assists, total_gold, 
+               lane, primary_runes, secondary_runes, spells, items, win,
+               vision_score, cs, damage_dealt, damage_taken, wards_placed, wards_destroyed,
+               double_kills, triple_kills, quadra_kills, penta_kills
+        FROM match_history 
+        WHERE puuid = ? 
+        ORDER BY match_date DESC 
+        LIMIT 20
+    """, (puuid,), db='match_history')
 
     match_data = []
     for match in matches:
-        spells = match['spells']
-        if isinstance(spells, str):
-            spell1, spell2 = spells.split(',')
-        else:
-            spell1, spell2 = "unknown", "unknown"
+        # Calcular KDA
+        deaths = match['deaths'] if match['deaths'] > 0 else 1
+        kda = round((match['kills'] + match['assists']) / deaths, 2)
 
-        items = match['items']
-        if not isinstance(items, str):
-            items = str(items)
+        # Manejo seguro de spells
+        spells = match['spells'].split(',') if isinstance(match['spells'], str) else []
+        spell1 = spells[0] if len(spells) > 0 else 'default'
+        spell2 = spells[1] if len(spells) > 1 else 'default'
 
         champion_name = champions.get(match['champion_id'], "Unknown Champion")
 
-        # Obtener los IDs de los ítems del diccionario y manejar correctamente los ítems que ya están en formato de cadena
-        item_ids = []
-        for item in items.split(','):
-            try:
-                item_id = int(item)
-            except ValueError:
-                item_id = item
-            item_ids.append(str(item_id))
 
-        # Obtener los IDs de las runas
-        primary_rune_ids = match['primary_runes'].split(',')
-        secondary_rune_ids = match['secondary_runes'].split(',')
+        # Manejo seguro de runas
+        primary_runes = match['primary_runes'].split(',') if isinstance(match['primary_runes'], str) else []
+        secondary_runes = match['secondary_runes'].split(',') if isinstance(match['secondary_runes'], str) else []
 
-        match_data.append({
-            "match_date": match['match_date'],
-            "champion_id": str(match['champion_id']),  # Convertir a cadena
-            "champion_name": champion_name,  # Obtener el nombre del campeón del diccionario
-            "kills": match['kills'],
-            "deaths": match['deaths'],
-            "assists": match['assists'],
-            "total_gold": match['total_gold'],
-            "lane": match['lane'],
-            "primary_runes": primary_rune_ids,  # Pasar los IDs de las runas primarias
-            "secondary_runes": secondary_rune_ids,  # Pasar los IDs de las runas secundarias
-            "spells": spells,
-            "item_list": ','.join(item_ids),  # Convertir la lista de IDs de ítems a una cadena
-            "elo": "NVE",  # Placeholder for elo, replace with actual data
-            "spell1_icon": f"{spell1}.png",  # Placeholder for spell1 icon path
-            "spell2_icon": f"{spell2}.png",  # Placeholder for spell2 icon path,
-            "result": "Win" if match['win'] else "Loss"  # Determinar el resultado de la partida
-        })
+        # Manejo seguro de items
+        items = match['items'].split(',') if isinstance(match['items'], str) else []
+        items = [item for item in items if item]  # Eliminar strings vacíos
 
-    print(f"Match data for {summoner_name}: {match_data}")  # Agregar esta línea para depuración
+        match_info = {
+            'match_date': match['match_date'],
+            "champion_id": str(match['champion_id']),
+            "champion_name": champion_name,
+            'kills': match['kills'],
+            'deaths': match['deaths'],
+            'assists': match['assists'],
+            'kda': kda,
+            'total_gold': match['total_gold'],
+            'cs': match['cs'],
+            'vision_score': match['vision_score'],
+            'damage_dealt': match['damage_dealt'],
+            'damage_taken': match['damage_taken'],
+            'wards_placed': match['wards_placed'],
+            'wards_destroyed': match['wards_destroyed'],
+            'lane': match['lane'],
+            'spell1_icon': f"{spell1}.png",
+            'spell2_icon': f"{spell2}.png",
+            'primary_runes': primary_runes,
+            'secondary_runes': secondary_runes,
+            'items': items,
+            'result': 'Victory' if match['win'] else 'Defeat',
+            'win': match['win'],
+            'result': 'Victory' if match['win'] else 'Defeat',  # Asegurarse de que sea Victory/Defeat
+            'multikills': {
+                'double': match['double_kills'],
+                'triple': match['triple_kills'],
+                'quadra': match['quadra_kills'],
+                'penta': match['penta_kills']
+            },
+            'elo': elo_display,
+            'wins': rank_info['wins'],
+            'losses': rank_info['losses'],
+            'queue_type': queue_type
+        }
+        match_data.append(match_info)
 
-    return render_template('match_history.html', summoner_name=summoner_name, players=players, matches=match_data)
+    # Obtener estadísticas del champion pool
+    champion_pool = get_champion_pool_stats(puuid)
+
+    # Calcular estadísticas generales
+    total_games = len(match_data)
+    if total_games > 0:
+        total_wins = sum(1 for match in match_data if match['win'])
+        total_kills = sum(match['kills'] for match in match_data)
+        total_deaths = sum(match['deaths'] for match in match_data)
+        total_assists = sum(match['assists'] for match in match_data)
+        
+        general_stats = {
+            'games': total_games,
+            'wins': total_wins,
+            'losses': total_games - total_wins,
+            'winrate': round((total_wins / total_games) * 100, 1),
+            'avg_kda': round((total_kills + total_assists) / max(total_deaths, 1), 2),
+            'avg_kills': round(total_kills / total_games, 1),
+            'avg_deaths': round(total_deaths / total_games, 1),
+            'avg_assists': round(total_assists / total_games, 1)
+        }
+    else:
+        general_stats = {
+            'games': 0,
+            'wins': 0,
+            'losses': 0,
+            'winrate': 0,
+            'avg_kda': 0,
+            'avg_kills': 0,
+            'avg_deaths': 0,
+            'avg_assists': 0
+        }
+
+    return render_template('match_history.html', players=players, matches=match_data, champion_pool=champion_pool, summoner_name=summoner_name, general_stats=general_stats)
+
+
+def get_summoner_id(summoner_name):
+    """ Obtiene el ID del invocador desde la base de datos league_tasks.db y luego desde la Riot API. """
+    # Obtener el PUUID del jugador desde la base de datos
+    player = query_db("SELECT puuid FROM players WHERE summoner_name = ?", (summoner_name,), one=True, db='league_tasks')
+    if not player:
+        print(f"Jugador con nombre {summoner_name} no encontrado en la base de datos.")
+        return None
+
+    puuid = player['puuid']
+
+    # Hacer una solicitud a la API de Riot para obtener el ID del invocador usando el PUUID
+    url = f"{SUMMONER_API_BASE_URL}/lol/summoner/v4/summoners/by-puuid/{puuid}?api_key={API_KEY}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json().get("id")
+    else:
+        print(f"Error en la API: {response.status_code}, {response.text}")
+        return None
+
+
+def get_soloq_elo(summoner_id):
+    """ Obtiene el ELO del jugador en SoloQ, o Flex si no tiene SoloQ. """
+    if not summoner_id:
+        print("Error: summoner_id es None.")
+        return {"tier": "UNRANKED", "rank": "", "lp": 0, "wins": 0, "losses": 0}
+
+    url = f"{SUMMONER_API_BASE_URL}/lol/league/v4/entries/by-summoner/{summoner_id}?api_key={API_KEY}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print(f"Error en la API: {response.status_code}, {response.text}")
+        return {"tier": "UNRANKED", "rank": "", "lp": 0, "wins": 0, "losses": 0}
+
+    rank_data = response.json()
+    default_data = {"tier": "UNRANKED", "rank": "", "lp": 0, "wins": 0, "losses": 0}
+
+    # Verificar si tiene SoloQ
+    for queue in rank_data:
+        if queue["queueType"] == "RANKED_SOLO_5x5":
+            return {
+                "tier": queue['tier'],
+                "rank": queue['rank'],
+                "lp": queue['leaguePoints'],
+                "wins": queue['wins'],
+                "losses": queue['losses'],
+                "queue_type": "RANKED_SOLO_5x5"
+            }
+
+    # Si no tiene SoloQ, verificar Flex
+    for queue in rank_data:
+        if queue["queueType"] == "RANKED_FLEX_SR":
+            return {
+                "tier": queue['tier'],
+                "rank": queue['rank'],
+                "lp": queue['leaguePoints'],
+                "wins": queue['wins'],
+                "losses": queue['losses'],
+                "queue_type": "RANKED_FLEX_SR"
+            }
+
+    return default_data
 
 # Inicializar la base de datos y correr la app
 if __name__ == '__main__':

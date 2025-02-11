@@ -7,6 +7,156 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
+<style>
+    /* 🎨 Estilos para Champion Pool */
+.champion-pool-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.champion-pool-table th, .champion-pool-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+.champion-pool-table th {
+    background-color: #222;
+    color: white;
+}
+
+/* 🎨 Estilos para Match History */
+.match-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.match-history-table th, .match-history-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+.match-history-table th {
+    background-color: #222;
+    color: white;
+}
+
+/* 🎨 Estilos para Match History */
+.match-history-table tr.win {
+        background-color: rgba(46, 204, 113, 0.1);  /* Color tenue basado en #2ecc71 (verde victoria) */
+    }
+
+    .match-history-table tr.loss {
+        background-color: rgba(231, 76, 60, 0.1);  /* Color tenue basado en #e74c3c (rojo derrota) */
+    }
+
+    .match-history-table .win-text {
+        color: #2ecc71;  /* Verde brillante para victoria */
+        font-weight: bold;
+    }
+
+    .match-history-table .loss-text {
+        color: #e74c3c;  /* Rojo brillante para derrota */
+        font-weight: bold;
+    }
+
+    /* Efecto hover opcional para mejorar la interactividad */
+    .match-history-table tr.win:hover {
+        background-color: rgba(46, 204, 113, 0.2);  /* Ligeramente más intenso al pasar el mouse */
+    }
+
+    .match-history-table tr.loss:hover {
+        background-color: rgba(231, 76, 60, 0.2);  /* Ligeramente más intenso al pasar el mouse */
+    }
+
+.runes img, .spells img, .build img {
+    margin: 2px;
+    border-radius: 5px;
+}
+.player-info-container {
+        margin: 20px 0;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+    }
+
+    .player-info-container h3 {
+        color: #000000;
+        margin-bottom: 15px;
+        font-size: 24px;
+    }
+
+    .rank-info {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 20px 0;
+    }
+
+    .rank-display {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+    }
+
+    .rank-image {
+        width: 120px;
+        height: 120px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .rank-icon {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .rank-details {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .rank-text {
+        color: #fff;
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    .win-loss {
+        color: #2b21dc;
+        font-size: 16px;
+    }
+
+    .winrate {
+        color: #4CAF50;
+        font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
+        .rank-display {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .rank-image {
+            width: 80px;
+            height: 80px;
+        }
+
+        .rank-text {
+            font-size: 18px;
+        }
+    }
+</style>
 
     <header>
         <h1>Player Match History</h1>
@@ -31,7 +181,6 @@
     <div class="container">
         <section class="history-section">
             <h2>Match History</h2>
-
             <form method="POST" action="{{ url_for('match_history') }}" class="player-form">
                 <label for="summoner_name">Select Player:</label>
                 <select name="summoner_name" id="summoner_name">
@@ -43,70 +192,131 @@
             </form>
 
             {% if matches %}
+            <div class="player-info-container">
                 <h3>Match History for {{ summoner_name }}</h3>
-                <div class="match-history">
-                    {% for match in matches %}
-                        <div class="match-card" onclick="this.classList.toggle('flipped')">
-                            <div class="card-inner">
-                                <!-- Frente de la tarjeta -->
-                                <div class="card-front">
-                                    <div class="match-header">
-                                        <p class="match-date">{{ match.match_date.strftime('%Y-%m-%d') }}</p>
-                                        <p class="player-info">
-                                            <span class="name">{{ summoner_name }}</span> - {{ match.elo }}
-                                        </p>
-                                    </div>
-
-                                    <div class="match-content">
-                                        <div class="champion">
-                                            <img src="{{ url_for('static', filename='img/champions/' + match.champion_name + '.png') }}" alt="{{ match.champion_name }}">
-                                            <div class="champion-info">
-                                                <p>{{ match.champion_name }}</p>
-                                                <p class="kda">{{ match.kills }} / {{ match.deaths }} / {{ match.assists }}</p>
-                                                <p>{{ match.lane }}</p>
-                                            </div>
-                                        </div>
-
-                                        <div class="spells">
-                                            <img src="{{ url_for('static', filename='img/spells/' + match.spell1_icon) }}" alt="Spell 1">
-                                            <img src="{{ url_for('static', filename='img/spells/' + match.spell2_icon) }}" alt="Spell 2">
-                                        </div>
-
-                                        <div class="build">
-                                            {% for item in match.item_list.split(',') %}
-                                                <img src="{{ url_for('static', filename='img/items/' + item + '.png') }}" alt="Item">
-                                            {% endfor %}
-                                        </div>
-
-                                        <div class="match-footer">
-                                            <p class="gold">{{ match.total_gold }} Gold</p>
-                                            <p class="result {{ 'win' if match.result == 'Win' else 'loss' }}">
-                                                {{ match.result }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Parte trasera de la tarjeta -->
-                                <div class="card-back">
-                                    <div class="runes">
-                                        <h4>Primary Runes</h4>
-                                        {% for rune_id in match.primary_runes %}
-                                            <img src="{{ url_for('static', filename='img/runes/' + rune_id + '.png') }}" alt="{{ rune_id }}">
-                                        {% endfor %}
-                                        <h4>Secondary Runes</h4>
-                                        {% for rune_id in match.secondary_runes %}
-                                            <img src="{{ url_for('static', filename='img/runes/' + rune_id + '.png') }}" alt="{{ rune_id }}">
-                                        {% endfor %}
-                                    </div>
-                                </div>
+                <div class="rank-info">
+                    {% if matches[0]['elo'] != "Unranked" %}
+                        {% set rank_data = matches[0]['elo'].split(' ') %}
+                        {% set tier = rank_data[0]|lower %}
+                        <div class="rank-display">
+                            <div class="rank-image">
+                                <img src="{{ url_for('static', filename='img/ranks/' + tier + '.png') }}" 
+                                    alt="{{ matches[0]['elo'] }}" 
+                                    class="rank-icon">
+                            </div>
+                            <div class="rank-details">
+                                <div class="queue-type">{{ matches[0]['queue_type'] }}</div>
+                                <span class="rank-text">{{ matches[0]['elo'] }}</span>
+                                <span class="win-loss">{{ matches[0]['wins'] }}W {{ matches[0]['losses'] }}L</span>
+                                {% set total_games = matches[0]['wins'] + matches[0]['losses'] %}
+                                {% if total_games > 0 %}
+                                    <span class="winrate">Winrate: {{ ((matches[0]['wins'] / total_games) * 100)|round(1) }}%</span>
+                                {% endif %}
                             </div>
                         </div>
-                    {% endfor %}
+                    {% else %}
+                        <div class="rank-display">
+                            <div class="rank-image">
+                                <img src="{{ url_for('static', filename='img/ranks/unranked.png') }}" 
+                                    alt="Unranked" 
+                                    class="rank-icon">
+                            </div>
+                            <div class="rank-details">
+                                <span class="rank-text">Unranked</span>
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
-            {% endif %}
-        </section>
-    </div>
+            </div>
 
-</body>
-</html>
+            <!-- 🏆 Champion Pool Analysis -->
+            <h3>Champion Pool</h3>
+            <table class="champion-pool-table">
+                <thead>
+                    <tr>
+                        <th>Champion</th>
+                        <th>Games Played</th>
+                        <th>Win Rate</th>
+                        <th>KDA</th>
+                        <th>CS/Game</th>
+                        <th>Gold/Game</th>
+                        <th>Vision Score/Game</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for champ in champion_pool %}
+                        <tr>
+                            <td>
+                                <img src="{{ url_for('static', filename='img/champions/' + champ.champion_name + '.png') }}" alt="{{ champ.champion_name }}" width="40">
+                                {{ champ.champion_name }}
+                            </td>
+                            <td>{{ champ.games_played }}</td>
+                            <td>{{ champ.win_rate }}%</td>
+                            <td>{{ champ.kda }}</td>
+                            <td>{{ champ.cs_per_game }}</td>
+                            <td>{{ champ.gold_per_game }}</td>
+                            <td>{{ champ.vision_score_per_game }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- 📜 Match History Table -->
+            <h3>Match History</h3>
+            <table class="match-history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Champion</th>
+                        <th>KDA</th>
+                        <th>Gold</th>
+                        <th>Lane</th>
+                        <th>Spells</th>
+                        <th>Runes</th>
+                        <th>Items</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for match in matches %}
+                        <tr class="{% if match.result == 'Win' %}win{% else %}loss{% endif %}">
+                            <td>{{ match.match_date.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <img src="{{ url_for('static', filename='img/champions/' + match.champion_name + '.png') }}" alt="{{ match.champion_name }}" width="40">
+                                <br>{{ match.champion_name }}
+                            </td>
+                            <td>{{ match.kills }} / {{ match.deaths }} / {{ match.assists }}</td>
+                            <td>{{ match.total_gold }}</td>
+                            <td>{{ match.lane }}</td>
+                            <td>
+                                <img src="{{ url_for('static', filename='img/spells/' + match['spell1_icon']) }}" alt="Spell 1" width="30">
+                                <img src="{{ url_for('static', filename='img/spells/' + match['spell2_icon']) }}" alt="Spell 2" width="30">
+                            </td>
+                            <td>
+                                <div class="runes">
+                                    {% for rune in match['primary_runes'] %}
+                                        <img src="{{ url_for('static', filename='img/runes/' + rune + '.png') }}" alt="Rune" width="30">
+                                    {% endfor %}
+                                    <br>
+                                    {% for rune in match['secondary_runes'] %}
+                                        <img src="{{ url_for('static', filename='img/runes/' + rune + '.png') }}" alt="Rune" width="30">
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td>
+                                {% for item in match['items'] %}
+                                    {% if item %}
+                                        <img src="{{ url_for('static', filename='img/items/' + item + '.png') }}" alt="Item" width="30">
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td class="{% if match.result == 'Victory' %}win-text{% else %}loss-text{% endif %}">
+                                {{ match.result }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+</div>
